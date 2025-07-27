@@ -1,20 +1,23 @@
-// middleware.ts
-import { NextResponse } from "next/server"
-import type { NextRequest } from "next/server"
+import { NextRequest, NextResponse } from 'next/server'
 
-export function middleware(request: NextRequest) {
-  const token = request.cookies.get("sb-access-token")
+export function middleware(req: NextRequest) {
+  const token = req.cookies.get('sb-access-token')?.value
+  const isAuth = !!token
 
-  const publicRoutes = ["/login", "/signup"]
-  const isPublic = publicRoutes.some((path) => request.nextUrl.pathname.startsWith(path))
+  const publicPaths = ['/login', '/signup']
+  const pathIsPublic = publicPaths.includes(req.nextUrl.pathname)
 
-  if (!token && !isPublic) {
-    return NextResponse.redirect(new URL("/login", request.url))
+  if (!isAuth && !pathIsPublic) {
+    return NextResponse.redirect(new URL('/login', req.url))
+  }
+
+  if (isAuth && pathIsPublic) {
+    return NextResponse.redirect(new URL('/dashboard', req.url))
   }
 
   return NextResponse.next()
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: ['/((?!_next|favicon.ico|.*\\..*).*)'],
 }
