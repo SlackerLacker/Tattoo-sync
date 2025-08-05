@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 import {
   Calendar,
@@ -11,10 +11,14 @@ import {
   Home,
   Share2,
   DollarSign,
-} from "lucide-react"
-import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+} from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase-browser";
+import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
 
 const navigationItems = [
   {
@@ -67,10 +71,40 @@ const navigationItems = [
     url: "/settings",
     icon: Settings,
   },
-]
+];
 
 export function AppSidebar() {
-  const pathname = usePathname()
+  const pathname = usePathname();
+  const [fullName, setFullName] = useState("");
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push("/login");
+  };
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError || !session?.user) return;
+
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", session.user.id)
+        .single();
+
+      if (!profileError && profile?.full_name) {
+        setFullName(profile.full_name);
+      }
+    };
+
+    fetchUser();
+  }, []);
 
   return (
     <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
@@ -81,8 +115,7 @@ export function AppSidebar() {
             <Palette className="size-5" />
           </div>
           <div>
-            <h2 className="font-semibold text-gray-900">InkSchedule</h2>
-            <p className="text-xs text-gray-500">Tattoo Shop Management</p>
+            <h2 className="font-semibold text-gray-900">InkSync</h2>
           </div>
         </div>
       </div>
@@ -90,21 +123,25 @@ export function AppSidebar() {
       {/* Navigation */}
       <nav className="flex-1 p-4">
         <div className="space-y-1">
-          <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">Navigation</p>
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">
+            Navigation
+          </p>
           {navigationItems.map((item) => {
-            const isActive = pathname === item.url
+            const isActive = pathname === item.url;
             return (
               <Link
                 key={item.title}
                 href={item.url}
                 className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  isActive ? "bg-purple-100 text-purple-700" : "text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                  isActive
+                    ? "bg-purple-100 text-purple-700"
+                    : "text-gray-700 hover:bg-gray-100 hover:text-gray-900"
                 }`}
               >
                 <item.icon className="size-4" />
                 {item.title}
               </Link>
-            )
+            );
           })}
         </div>
       </nav>
@@ -114,14 +151,21 @@ export function AppSidebar() {
         <div className="flex items-center gap-3 px-3 py-2">
           <Avatar className="h-8 w-8">
             <AvatarImage src="/placeholder.svg?height=32&width=32" />
-            <AvatarFallback>JS</AvatarFallback>
+            <AvatarFallback>SO</AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900 truncate">John Smith</p>
+            <p className="text-sm font-medium text-gray-900 truncate">
+              {fullName || "Loading..."}
+            </p>
             <p className="text-xs text-gray-500 truncate">Shop Owner</p>
           </div>
         </div>
+        <div className="flex mt-2">
+          <Button variant="destructive" onClick={handleLogout}>
+            Logout
+          </Button>
+        </div>
       </div>
     </div>
-  )
+  );
 }

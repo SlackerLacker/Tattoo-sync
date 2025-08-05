@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase-browser'
 import { Button } from '@/components/ui/button'
+import type { User } from '@supabase/supabase-js'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -63,7 +64,7 @@ const recentActivity = [
   { id: 5, type: "review", message: "5-star review received for Luna Martinez", time: "3 hours ago" },
 ]
 
-export default function DashboardClient({ user }: { user: any }) {
+export default function DashboardClient({ user }: { user: User }) {
   const router = useRouter()
   const [timeRange, setTimeRange] = useState("30d")
 
@@ -123,7 +124,6 @@ export default function DashboardClient({ user }: { user: any }) {
         </div>
       </div>
 
-      /* Key Metrics */
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardContent className="p-6">
