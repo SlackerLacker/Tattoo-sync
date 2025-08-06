@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 type Profile = {
   id: string;
@@ -126,7 +127,9 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="p-8 max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4 text-center">Superadmin Dashboard</h1>
+      <h1 className="text-2xl font-bold mb-4 text-center">
+        Superadmin Dashboard
+      </h1>
 
       <div className="space-y-4">
         {/* Create Studio + User */}
@@ -185,10 +188,16 @@ export default function AdminDashboardPage() {
                 key={studio.id}
                 className="flex justify-between items-center border p-3 rounded-md"
               >
-                <div>
-                  <p className="font-medium">{studio.name}</p>
-                  <p className="text-sm text-gray-500">ID: {studio.id}</p>
-                </div>
+                {/* Wrap the studio info in a Link */}
+                <Link
+                  href={`/admin-dashboard/studio/${studio.id}`}
+                  className="flex-grow"
+                >
+                  <div>
+                    <p className="font-medium">{studio.name}</p>
+                    <p className="text-sm text-gray-500">ID: {studio.id}</p>
+                  </div>
+                </Link>
                 <Button
                   variant="destructive"
                   onClick={() => handleDeleteStudio(studio.id)}
