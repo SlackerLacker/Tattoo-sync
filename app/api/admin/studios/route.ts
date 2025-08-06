@@ -72,14 +72,14 @@ export async function POST(req: NextRequest) {
   // Create a new studio and its initial user
   const auth = await authorizeSuperadmin();
   if (!auth.ok) return auth.error!;
-  const { studioName, studioDomain, userEmail, userPassword, userRole } = await req.json();
-  if (!studioName || !studioDomain || !userEmail || !userPassword || !userRole) {
+  const { studioName, userEmail, userPassword, userRole } = await req.json();
+  if (!studioName || !userEmail || !userPassword || !userRole) {
     return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
   }
   // 1. Create the studio record with name and domain
   const { data: studio, error: studioError } = await supabaseAdmin
     .from('studios')
-    .insert([{ name: studioName, domain: studioDomain }])
+    .insert([{ name: studioName}])
     .select()
     .single();
   if (studioError) {

@@ -1,21 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { redirect } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabase-browser"; // or "@/lib/supabase" if you prefer the generic client
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { useRouter } from "next/navigation";
 
 type Profile = {
   id: string;
   email: string;
-  name?: string;
+  full_name: string;
   role: string;
   studio_id: string;
 };
@@ -30,6 +25,7 @@ export default function AdminDashboardPage() {
   const [users, setUsers] = useState<Profile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [authorized, setAuthorized] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     const init = async () => {
@@ -39,7 +35,8 @@ export default function AdminDashboardPage() {
       const user = session?.user;
 
       if (!user) {
-        redirect("/login");
+        router.push("/login");
+        console.log("Unauthorized access. not a user, redirecting to login");
         return;
       }
 
@@ -50,7 +47,10 @@ export default function AdminDashboardPage() {
         .single();
 
       if (error || profile?.role !== "superadmin") {
-        redirect("/unauthorized");
+        router.push("/login");
+        console.log(
+          "Unauthorized access as a superadmin, redirecting to login"
+        );
         return;
       }
 
@@ -61,7 +61,7 @@ export default function AdminDashboardPage() {
     };
 
     init();
-  }, []);
+  }, [router]);
 
   const fetchStudios = async () => {
     const res = await fetch("/api/admin/studios");
@@ -81,7 +81,6 @@ export default function AdminDashboardPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         studioName,
-        studioDomain,
         userEmail,
         userPassword,
         userRole,
@@ -90,7 +89,6 @@ export default function AdminDashboardPage() {
 
     if (res.ok) {
       setStudioName("");
-      setStudioDomain("");
       setUserEmail("");
       setUserPassword("");
       await fetchStudios();
@@ -128,37 +126,30 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="p-8 max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4">Superadmin Dashboard</h1>
+      <h1 className="text-2xl font-bold mb-4 text-center">Superadmin Dashboard</h1>
 
       <div className="space-y-4">
         {/* Create Studio + User */}
         <div>
-          <h2 className="text-xl font-semibold mb-2">
+          <h2 className="text-xl font-semibold mb-2 mt-8">
             Create New Studio + User
           </h2>
+          <div className="mt-8">
+            <Label>Studio Name</Label>
+            <Input
+              value={studioName}
+              onChange={(e) => setStudioName(e.target.value)}
+            />
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label>Studio Name</Label>
-              <Input
-                value={studioName}
-                onChange={(e) => setStudioName(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label>Studio Domain</Label>
-              <Input
-                value={studioDomain}
-                onChange={(e) => setStudioDomain(e.target.value)}
-              />
-            </div>
-            <div>
+            <div className="mt-8">
               <Label>User Email</Label>
               <Input
                 value={userEmail}
                 onChange={(e) => setUserEmail(e.target.value)}
               />
             </div>
-            <div>
+            <div className="mt-8">
               <Label>User Password</Label>
               <Input
                 type="password"
@@ -180,14 +171,14 @@ export default function AdminDashboardPage() {
               </select>
             </div>
           </div>
-          <Button className="mt-4" onClick={handleCreateStudio}>
+          <Button className="mt-8" onClick={handleCreateStudio}>
             Create Studio and User
           </Button>
         </div>
 
         {/* Studios */}
         <div>
-          <h2 className="text-xl font-semibold mt-8 mb-2">Studios</h2>
+          <h2 className="text-xl font-semibold mt-10 mb-2">Studios</h2>
           <ul className="space-y-2">
             {studios.map((studio) => (
               <li
@@ -196,7 +187,7 @@ export default function AdminDashboardPage() {
               >
                 <div>
                   <p className="font-medium">{studio.name}</p>
-                  <p className="text-sm text-gray-500">{studio.domain}</p>
+                  <p className="text-sm text-gray-500">ID: {studio.id}</p>
                 </div>
                 <Button
                   variant="destructive"
@@ -215,7 +206,7 @@ export default function AdminDashboardPage() {
           <ul className="space-y-2">
             {users.map((user) => (
               <li key={user.id} className="border p-3 rounded-md">
-                <p className="font-medium">{user.name || user.email}</p>
+                <p className="font-medium">{user.full_name}</p>
                 <p className="text-sm text-gray-500">
                   Role: {user.role} | Studio ID: {user.studio_id}
                 </p>
