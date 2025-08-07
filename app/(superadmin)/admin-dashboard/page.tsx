@@ -17,13 +17,20 @@ type Profile = {
 };
 
 export default function AdminDashboardPage() {
+  //Studio creation state
   const [studioName, setStudioName] = useState("");
-  const [studioDomain, setStudioDomain] = useState("");
+
+  //User creation state
+  const [userName, setUserName] = useState("");
   const [userEmail, setUserEmail] = useState("");
   const [userPassword, setUserPassword] = useState("");
   const [userRole, setUserRole] = useState("admin");
+  const [userStudioId, setUserStudioId] = useState("");
+  // Data lists
   const [studios, setStudios] = useState<any[]>([]);
   const [users, setUsers] = useState<Profile[]>([]);
+
+  //Authorization / loading state
   const [isLoading, setIsLoading] = useState(true);
   const [authorized, setAuthorized] = useState(false);
   const router = useRouter();
@@ -64,6 +71,12 @@ export default function AdminDashboardPage() {
     init();
   }, [router]);
 
+  useEffect(() => {
+    if (studios.length > 0 && !userStudioId) {
+      setUserStudioId(studios[0].id);
+    }
+  }, [studios, userStudioId]);
+
   const fetchStudios = async () => {
     const res = await fetch("/api/admin/studios");
     const data = await res.json();
@@ -80,23 +93,14 @@ export default function AdminDashboardPage() {
     const res = await fetch("/api/admin/studios", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        studioName,
-        userEmail,
-        userPassword,
-        userRole,
-      }),
+      body: JSON.stringify({ studioName }),
     });
-
     if (res.ok) {
       setStudioName("");
-      setUserEmail("");
-      setUserPassword("");
       await fetchStudios();
-      await fetchUsers();
     } else {
       const err = await res.json();
-      alert(err.error || "Failed to create studio/user");
+      alert(err.error || "Failed to create studio");
     }
   };
 
@@ -112,6 +116,38 @@ export default function AdminDashboardPage() {
       await fetchUsers();
     } else {
       alert("Failed to delete studio");
+    }
+  };
+
+  const handleCreateUser = async () => {
+    if (!userStudioId) {
+      alert("Please select a studio");
+      return;
+    }
+    const res = await fetch("/api/admin/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: userEmail,
+        password: userPassword,
+        role: userRole,
+        studioId: userStudioId,
+        full_name: userName,
+      }),
+    });
+
+    if (res.ok) {
+      setUserName("");
+      setUserEmail("");
+      setUserPassword("");
+      setUserRole("admin");
+      if (studios.length > 0) {
+        setUserStudioId(studios[0].id);
+      }
+      await fetchUsers();
+    } else {
+      const err = await res.json();
+      alert(err.error || "Failed to create user");
     }
   };
 
@@ -134,94 +170,119 @@ export default function AdminDashboardPage() {
       <div className="space-y-4">
         {/* Create Studio + User */}
         <div>
-          <h2 className="text-xl font-semibold mb-2 mt-8">
-            Create New Studio + User
-          </h2>
-          <div className="mt-8">
+          <h2 className="text-xl font-semibold mb-2 mt-8">Create New Studio</h2>
+          <div>
             <Label>Studio Name</Label>
             <Input
               value={studioName}
               onChange={(e) => setStudioName(e.target.value)}
             />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="mt-8">
-              <Label>User Email</Label>
-              <Input
-                value={userEmail}
-                onChange={(e) => setUserEmail(e.target.value)}
-              />
-            </div>
-            <div className="mt-8">
-              <Label>User Password</Label>
-              <Input
-                type="password"
-                value={userPassword}
-                onChange={(e) => setUserPassword(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label>User Role</Label>
-              <select
-                value={userRole}
-                onChange={(e) => setUserRole(e.target.value)}
-                className="border p-2 rounded-md w-full"
-              >
-                <option value="superadmin">Super Admin</option>
-                <option value="admin">Admin</option>
-                <option value="artist">Artist</option>
-                <option value="client">Client</option>
-              </select>
-            </div>
-          </div>
-          <Button className="mt-8" onClick={handleCreateStudio}>
-            Create Studio and User
+          <Button className="mt-4" onClick={handleCreateStudio}>
+            Create Studio
           </Button>
-        </div>
-
-        {/* Studios */}
-        <div>
-          <h2 className="text-xl font-semibold mt-10 mb-2">Studios</h2>
-          <ul className="space-y-2">
-            {studios.map((studio) => (
-              <li
-                key={studio.id}
-                className="flex justify-between items-center border p-3 rounded-md"
-              >
-                {/* Wrap the studio info in a Link */}
-                <Link
-                  href={`/admin-dashboard/studio/${studio.id}`}
-                  className="flex-grow"
+          <div className="mb-8 mt-8">
+            <h2 className="text-xl font-semibold mb-2">Create New User</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label>Name</Label>
+                <Input
+                  value={userName}
+                  onChange={(e) => setUserName(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label>Email</Label>
+                <Input
+                  value={userEmail}
+                  onChange={(e) => setUserEmail(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label>Password</Label>
+                <Input
+                  type="password"
+                  value={userPassword}
+                  onChange={(e) => setUserPassword(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label>Role</Label>
+                <select
+                  value={userRole}
+                  onChange={(e) => setUserRole(e.target.value)}
+                  className="border p-2 rounded-md w-full"
                 >
-                  <div>
-                    <p className="font-medium">{studio.name}</p>
-                    <p className="text-sm text-gray-500">ID: {studio.id}</p>
-                  </div>
-                </Link>
-                <Button
-                  variant="destructive"
-                  onClick={() => handleDeleteStudio(studio.id)}
+                  <option value="admin">Admin</option>
+                  <option value="artist">Artist</option>
+                  <option value="client">Client</option>
+                  <option value="superadmin">Super Admin</option>
+                </select>
+              </div>
+              <div>
+                <Label>Assign to Studio</Label>
+                <select
+                  value={userStudioId}
+                  onChange={(e) => setUserStudioId(e.target.value)}
+                  className="border p-2 rounded-md w-full"
                 >
-                  Delete
-                </Button>
-              </li>
-            ))}
-          </ul>
-        </div>
+                  {studios.map((studio) => (
+                    <option key={studio.id} value={studio.id}>
+                      {studio.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <Button className="mt-4" onClick={handleCreateUser}>
+              Create User
+            </Button>
+          </div>
 
-        {/* Users */}
-        <div>
-          <h2 className="text-xl font-semibold mt-8 mb-2">Users</h2>
-          <ul className="space-y-2">
-            {users.map((user) => (
-              <li key={user.id} className="border p-3 rounded-md">
-                <p className="font-medium">{user.full_name}</p>
-                <p className="text-sm text-gray-500">
-                  Role: {user.role} | Studio ID: {user.studio_id}
-                </p>
-              </li>
-            ))}
-          </ul>
+          {/* Studios */}
+          <div>
+            <h2 className="text-xl font-semibold mt-10 mb-2">Studios</h2>
+            <ul className="space-y-2">
+              {studios.map((studio) => (
+                <li
+                  key={studio.id}
+                  className="flex justify-between items-center border p-3 rounded-md"
+                >
+                  {/* Wrap the studio info in a Link */}
+                  <Link
+                    href={`/admin-dashboard/studio/${studio.id}`}
+                    className="flex-grow"
+                  >
+                    <div>
+                      <p className="font-medium">{studio.name}</p>
+                      <p className="text-sm text-gray-500">ID: {studio.id}</p>
+                    </div>
+                  </Link>
+                  <Button
+                    variant="destructive"
+                    onClick={() => handleDeleteStudio(studio.id)}
+                  >
+                    Delete
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Users */}
+          <div>
+            <h2 className="text-xl font-semibold mt-8 mb-2">Users</h2>
+            <ul className="space-y-2">
+              {users.map((user) => (
+                <li key={user.id} className="border p-3 rounded-md">
+                  <p className="font-medium">{user.full_name}</p>
+                  <p className="text-sm text-gray-500">
+                    Role: {user.role} | Studio ID: {user.studio_id}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       </div>
     </div>
