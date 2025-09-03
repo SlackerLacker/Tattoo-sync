@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -38,206 +38,44 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { supabase } from "@/lib/supabase/browser-client"
 
-const artists = [
-  { id: 1, name: "Mike Rodriguez", specialty: "Traditional", color: "bg-blue-500", hourlyRate: 150 },
-  { id: 2, name: "Luna Martinez", specialty: "Fine Line", color: "bg-purple-500", hourlyRate: 120 },
-  { id: 3, name: "Jake Thompson", specialty: "Realism", color: "bg-green-500", hourlyRate: 180 },
-  { id: 4, name: "Sarah Kim", specialty: "Watercolor", color: "bg-pink-500", hourlyRate: 140 },
-]
+interface Artist {
+  id: number
+  name: string
+  specialty: string
+  color: string
+  hourly_rate: number
+}
 
-const services = [
-  { id: 1, name: "Small Tattoo", suggestedDuration: 1 },
-  { id: 2, name: "Medium Tattoo", suggestedDuration: 2 },
-  { id: 3, name: "Large Tattoo Session", suggestedDuration: 4 },
-  { id: 4, name: "Consultation", suggestedDuration: 0.5 },
-  { id: 5, name: "Touch-up Session", suggestedDuration: 1 },
-  { id: 6, name: "Fine Line Tattoo", suggestedDuration: 1.5 },
-  { id: 7, name: "Traditional Tattoo", suggestedDuration: 2 },
-  { id: 8, name: "Realism Tattoo", suggestedDuration: 3 },
-  { id: 9, name: "Watercolor Tattoo", suggestedDuration: 2.5 },
-  { id: 10, name: "Cover-up Consultation", suggestedDuration: 1 },
-]
+interface Service {
+  id: number
+  name: string
+  suggested_duration: number
+}
 
 interface Appointment {
   id: number
-  artistId: number
+  artist_id: number
   client: string
   service: string
   date: string
-  startTime: number
+  start_time: number
   duration: number
   status: "confirmed" | "pending" | "cancelled" | "completed"
   phone: string
   email?: string
   notes?: string
   price?: number
-  depositPaid?: number
-  createdAt: string
+  deposit_paid?: number
+  created_at: string
 }
 
-const initialAppointments: Appointment[] = [
-  {
-    id: 1,
-    artistId: 1,
-    client: "Sarah Johnson",
-    service: "Traditional Sleeve Session",
-    date: "2024-01-22",
-    startTime: 10,
-    duration: 4,
-    status: "confirmed",
-    phone: "(555) 123-4567",
-    email: "sarah.johnson@email.com",
-    price: 600,
-    depositPaid: 200,
-    createdAt: "2024-01-15T10:30:00",
-    notes: "Continuing work on traditional sleeve. Client prefers bold colors.",
-  },
-  {
-    id: 2,
-    artistId: 2,
-    client: "David Chen",
-    service: "Small Script Tattoo",
-    date: "2024-01-22",
-    startTime: 14,
-    duration: 1,
-    status: "confirmed",
-    phone: "(555) 234-5678",
-    email: "david.chen@email.com",
-    price: 120,
-    depositPaid: 50,
-    createdAt: "2024-01-18T14:20:00",
-    notes: "First tattoo. Wants small script on wrist.",
-  },
-  {
-    id: 3,
-    artistId: 3,
-    client: "Emma Wilson",
-    service: "Consultation",
-    date: "2024-01-23",
-    startTime: 16.5,
-    duration: 0.5,
-    status: "pending",
-    phone: "(555) 345-6789",
-    email: "emma.wilson@email.com",
-    price: 90,
-    createdAt: "2024-01-20T09:15:00",
-    notes: "Cover-up consultation. Nervous about the process.",
-  },
-  {
-    id: 4,
-    artistId: 1,
-    client: "Alex Rivera",
-    service: "Cover-up Touch-up",
-    date: "2024-01-24",
-    startTime: 15,
-    duration: 2,
-    status: "confirmed",
-    phone: "(555) 456-7890",
-    email: "alex.rivera@email.com",
-    price: 300,
-    depositPaid: 100,
-    createdAt: "2024-01-19T11:45:00",
-    notes: "Touch-up work on previous cover-up tattoo.",
-  },
-  {
-    id: 5,
-    artistId: 2,
-    client: "Maria Garcia",
-    service: "Fine Line Flowers",
-    date: "2024-01-25",
-    startTime: 11,
-    duration: 2,
-    status: "confirmed",
-    phone: "(555) 567-8901",
-    email: "maria.garcia@email.com",
-    price: 240,
-    depositPaid: 80,
-    createdAt: "2024-01-17T16:30:00",
-    notes: "Delicate flower design on forearm.",
-  },
-  {
-    id: 6,
-    artistId: 4,
-    client: "Tom Wilson",
-    service: "Watercolor Design",
-    date: "2024-01-26",
-    startTime: 13,
-    duration: 3,
-    status: "confirmed",
-    phone: "(555) 678-9012",
-    email: "tom.wilson@email.com",
-    price: 420,
-    depositPaid: 150,
-    createdAt: "2024-01-16T13:20:00",
-    notes: "Abstract watercolor piece on shoulder.",
-  },
-  {
-    id: 7,
-    artistId: 3,
-    client: "Lisa Brown",
-    service: "Realism Portrait",
-    date: "2024-01-20",
-    startTime: 10,
-    duration: 4,
-    status: "completed",
-    phone: "(555) 789-0123",
-    email: "lisa.brown@email.com",
-    price: 720,
-    depositPaid: 200,
-    createdAt: "2024-01-10T12:00:00",
-    notes: "Portrait of client's grandmother. Completed successfully.",
-  },
-  {
-    id: 8,
-    artistId: 2,
-    client: "James Miller",
-    service: "Small Tattoo",
-    date: "2024-01-19",
-    startTime: 15,
-    duration: 1,
-    status: "cancelled",
-    phone: "(555) 890-1234",
-    email: "james.miller@email.com",
-    price: 120,
-    createdAt: "2024-01-18T10:15:00",
-    notes: "Client cancelled due to scheduling conflict.",
-  },
-  {
-    id: 9,
-    artistId: 1,
-    client: "Rachel Davis",
-    service: "Traditional Tattoo",
-    date: "2024-01-27",
-    startTime: 12,
-    duration: 2.5,
-    status: "pending",
-    phone: "(555) 901-2345",
-    email: "rachel.davis@email.com",
-    price: 375,
-    createdAt: "2024-01-21T14:45:00",
-    notes: "Waiting for design approval before confirming.",
-  },
-  {
-    id: 10,
-    artistId: 4,
-    client: "Kevin Lee",
-    service: "Touch-up Session",
-    date: "2024-01-28",
-    startTime: 14,
-    duration: 1,
-    status: "confirmed",
-    phone: "(555) 012-3456",
-    email: "kevin.lee@email.com",
-    price: 140,
-    depositPaid: 50,
-    createdAt: "2024-01-20T16:20:00",
-    notes: "Touch-up on watercolor piece from last year.",
-  },
-]
-
 export default function AppointmentsPage() {
-  const [appointments, setAppointments] = useState<Appointment[]>(initialAppointments)
+  const [appointments, setAppointments] = useState<Appointment[]>([])
+  const [artists, setArtists] = useState<Artist[]>([])
+  const [services, setServices] = useState<Service[]>([])
+  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [artistFilter, setArtistFilter] = useState("all")
@@ -247,6 +85,34 @@ export default function AppointmentsPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [formData, setFormData] = useState<Partial<Appointment>>({})
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true)
+      try {
+        const { data: appointmentsData, error: appointmentsError } = await supabase
+          .from("appointments")
+          .select("*")
+        if (appointmentsError) throw appointmentsError
+        setAppointments(appointmentsData || [])
+
+        const { data: artistsData, error: artistsError } = await supabase.from("artists").select("*")
+        if (artistsError) throw artistsError
+        setArtists(artistsData || [])
+
+        const { data: servicesData, error: servicesError } = await supabase.from("services").select("*")
+        if (servicesError) throw servicesError
+        setServices(servicesData || [])
+      } catch (error) {
+        console.error("Error fetching data:", error)
+        // Optionally, show a toast or error message to the user
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [])
 
   const formatTime = (hour: number) => {
     const h = Math.floor(hour)
@@ -316,7 +182,7 @@ export default function AppointmentsPage() {
           (appointment.email && appointment.email.toLowerCase().includes(searchTerm.toLowerCase()))
 
         const matchesStatus = statusFilter === "all" || appointment.status === statusFilter
-        const matchesArtist = artistFilter === "all" || appointment.artistId.toString() === artistFilter
+        const matchesArtist = artistFilter === "all" || appointment.artist_id.toString() === artistFilter
 
         const appointmentDate = new Date(appointment.date)
         let matchesDate = true
@@ -339,7 +205,7 @@ export default function AppointmentsPage() {
         // Sort by date first, then by start time
         const dateCompare = new Date(a.date).getTime() - new Date(b.date).getTime()
         if (dateCompare !== 0) return dateCompare
-        return a.startTime - b.startTime
+        return a.start_time - b.start_time
       })
   }
 
@@ -375,31 +241,70 @@ export default function AppointmentsPage() {
     setIsDeleteDialogOpen(true)
   }
 
-  const handleEditAppointment = () => {
+  const handleEditAppointment = async () => {
     if (selectedAppointment && formData.client && formData.service) {
-      const updatedAppointments = appointments.map((apt) =>
-        apt.id === selectedAppointment.id ? { ...apt, ...formData } : apt,
-      )
-      setAppointments(updatedAppointments)
-      setIsEditDialogOpen(false)
-      setFormData({})
-      setSelectedAppointment(null)
+      try {
+        const { error } = await supabase
+          .from("appointments")
+          .update(formData)
+          .eq("id", selectedAppointment.id)
+
+        if (error) throw error
+
+        // Refresh data
+        const { data: appointmentsData, error: appointmentsError } = await supabase
+          .from("appointments")
+          .select("*")
+        if (appointmentsError) throw appointmentsError
+        setAppointments(appointmentsData || [])
+
+        setIsEditDialogOpen(false)
+        setFormData({})
+        setSelectedAppointment(null)
+        // Optionally, show a success toast
+      } catch (error) {
+        console.error("Error updating appointment:", error)
+        // Optionally, show an error toast
+      }
     }
   }
 
-  const handleDeleteAppointment = () => {
+  const handleDeleteAppointment = async () => {
     if (selectedAppointment) {
-      setAppointments(appointments.filter((apt) => apt.id !== selectedAppointment.id))
-      setIsDeleteDialogOpen(false)
-      setSelectedAppointment(null)
+      try {
+        const { error } = await supabase.from("appointments").delete().eq("id", selectedAppointment.id)
+
+        if (error) throw error
+
+        setAppointments(appointments.filter((apt) => apt.id !== selectedAppointment.id))
+        setIsDeleteDialogOpen(false)
+        setSelectedAppointment(null)
+        // Optionally, show a success toast
+      } catch (error) {
+        console.error("Error deleting appointment:", error)
+        // Optionally, show an error toast
+      }
     }
   }
 
-  const updateAppointmentStatus = (
+  const updateAppointmentStatus = async (
     appointmentId: number,
     newStatus: "confirmed" | "pending" | "cancelled" | "completed",
   ) => {
-    setAppointments(appointments.map((apt) => (apt.id === appointmentId ? { ...apt, status: newStatus } : apt)))
+    try {
+      const { error } = await supabase
+        .from("appointments")
+        .update({ status: newStatus })
+        .eq("id", appointmentId)
+
+      if (error) throw error
+
+      setAppointments(appointments.map((apt) => (apt.id === appointmentId ? { ...apt, status: newStatus } : apt)))
+      // Optionally, show a success toast
+    } catch (error) {
+      console.error("Error updating status:", error)
+      // Optionally, show an error toast
+    }
   }
 
   return (
@@ -514,364 +419,385 @@ export default function AppointmentsPage() {
       </Card>
 
       {/* Appointments List */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Appointments</CardTitle>
-          <CardDescription>
-            {filteredAppointments.length} appointment{filteredAppointments.length !== 1 ? "s" : ""} found
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
-          <ScrollArea className="h-[600px]">
-            <div className="space-y-2 p-4">
-              {filteredAppointments.map((appointment) => {
-                const artist = getArtistById(appointment.artistId)
-                const appointmentDate = new Date(appointment.date)
-                const isToday = appointmentDate.toDateString() === new Date().toDateString()
-                const isPast = appointmentDate < new Date()
-
-                return (
-                  <Card
-                    key={appointment.id}
-                    className={`transition-colors hover:bg-gray-50 ${isToday ? "border-blue-200 bg-blue-50" : ""}`}
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <Avatar className="h-10 w-10">
-                            <AvatarImage
-                              src={`/placeholder.svg?height=40&width=40&text=${artist?.name
-                                .split(" ")
-                                .map((n) => n[0])
-                                .join("")}`}
-                            />
-                            <AvatarFallback>
-                              {artist?.name
-                                .split(" ")
-                                .map((n) => n[0])
-                                .join("")}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <h3 className="font-semibold">{appointment.client}</h3>
-                              <Badge className={getStatusColor(appointment.status)}>{appointment.status}</Badge>
-                              {isToday && (
-                                <Badge variant="outline" className="text-blue-600">
-                                  Today
-                                </Badge>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                              <div className="flex items-center gap-1">
-                                <User className="h-3 w-3" />
-                                {artist?.name}
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <Calendar className="h-3 w-3" />
-                                {formatDate(appointment.date)}
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
-                                {formatTime(appointment.startTime)} -{" "}
-                                {formatTime(appointment.startTime + appointment.duration)}
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <DollarSign className="h-3 w-3" />${appointment.price}
-                              </div>
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              <span className="font-medium">{appointment.service}</span>
-                              {appointment.depositPaid && (
-                                <span className="ml-2">• Deposit: ${appointment.depositPaid}</span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {getStatusIcon(appointment.status)}
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => openViewDialog(appointment)}>
-                                <Eye className="mr-2 h-4 w-4" />
-                                View Details
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => openEditDialog(appointment)}>
-                                <Edit className="mr-2 h-4 w-4" />
-                                Edit
-                              </DropdownMenuItem>
-                              {appointment.status === "pending" && (
-                                <DropdownMenuItem onClick={() => updateAppointmentStatus(appointment.id, "confirmed")}>
-                                  <CheckCircle className="mr-2 h-4 w-4" />
-                                  Confirm
-                                </DropdownMenuItem>
-                              )}
-                              {appointment.status === "confirmed" && !isPast && (
-                                <DropdownMenuItem onClick={() => updateAppointmentStatus(appointment.id, "completed")}>
-                                  <CheckCircle className="mr-2 h-4 w-4" />
-                                  Mark Complete
-                                </DropdownMenuItem>
-                              )}
-                              <DropdownMenuItem onClick={() => openDeleteDialog(appointment)} className="text-red-600">
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Cancel
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )
-              })}
-            </div>
-          </ScrollArea>
-        </CardContent>
-      </Card>
-
-      {filteredAppointments.length === 0 && (
+      {loading ? (
         <Card>
           <CardContent className="p-12 text-center">
-            <Calendar className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No appointments found</h3>
-            <p className="text-muted-foreground mb-4">
-              {searchTerm || statusFilter !== "all" || artistFilter !== "all" || dateFilter !== "all"
-                ? "Try adjusting your filters to see more results."
-                : "No appointments have been scheduled yet."}
-            </p>
-            <Button asChild>
-              <a href="/schedule">
-                <Plus className="mr-2 h-4 w-4" />
-                Schedule Appointment
-              </a>
-            </Button>
+            <p>Loading appointments...</p>
           </CardContent>
         </Card>
-      )}
+      ) : (
+        <>
+          <Card>
+            <CardHeader>
+              <CardTitle>Appointments</CardTitle>
+              <CardDescription>
+                {filteredAppointments.length} appointment{filteredAppointments.length !== 1 ? "s" : ""} found
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              <ScrollArea className="h-[600px]">
+                <div className="space-y-2 p-4">
+                  {filteredAppointments.map((appointment) => {
+                    const artist = getArtistById(appointment.artist_id)
+                    const appointmentDate = new Date(appointment.date)
+                    const isToday = appointmentDate.toDateString() === new Date().toDateString()
+                    const isPast = appointmentDate < new Date()
 
-      {/* View Appointment Dialog */}
-      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Appointment Details</DialogTitle>
-            <DialogDescription>View complete appointment information</DialogDescription>
-          </DialogHeader>
-          {selectedAppointment && (
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Client</Label>
-                  <p className="text-sm font-semibold">{selectedAppointment.client}</p>
+                    return (
+                      <Card
+                        key={appointment.id}
+                        className={`transition-colors hover:bg-gray-50 ${
+                          isToday ? "border-blue-200 bg-blue-50" : ""
+                        }`}
+                      >
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                              <Avatar className="h-10 w-10">
+                                <AvatarImage
+                                  src={`/placeholder.svg?height=40&width=40&text=${artist?.name
+                                    .split(" ")
+                                    .map((n) => n[0])
+                                    .join("")}`}
+                                />
+                                <AvatarFallback>
+                                  {artist?.name
+                                    .split(" ")
+                                    .map((n) => n[0])
+                                    .join("")}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <h3 className="font-semibold">{appointment.client}</h3>
+                                  <Badge className={getStatusColor(appointment.status)}>{appointment.status}</Badge>
+                                  {isToday && (
+                                    <Badge variant="outline" className="text-blue-600">
+                                      Today
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                                  <div className="flex items-center gap-1">
+                                    <User className="h-3 w-3" />
+                                    {artist?.name}
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <Calendar className="h-3 w-3" />
+                                    {formatDate(appointment.date)}
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <Clock className="h-3 w-3" />
+                                    {formatTime(appointment.start_time)} -{" "}
+                                    {formatTime(appointment.start_time + appointment.duration)}
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <DollarSign className="h-3 w-3" />${appointment.price}
+                                  </div>
+                                </div>
+                                <div className="text-sm text-muted-foreground">
+                                  <span className="font-medium">{appointment.service}</span>
+                                  {appointment.deposit_paid && (
+                                    <span className="ml-2">• Deposit: ${appointment.deposit_paid}</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {getStatusIcon(appointment.status)}
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="sm">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => openViewDialog(appointment)}>
+                                    <Eye className="mr-2 h-4 w-4" />
+                                    View Details
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => openEditDialog(appointment)}>
+                                    <Edit className="mr-2 h-4 w-4" />
+                                    Edit
+                                  </DropdownMenuItem>
+                                  {appointment.status === "pending" && (
+                                    <DropdownMenuItem
+                                      onClick={() => updateAppointmentStatus(appointment.id, "confirmed")}
+                                    >
+                                      <CheckCircle className="mr-2 h-4 w-4" />
+                                      Confirm
+                                    </DropdownMenuItem>
+                                  )}
+                                  {appointment.status === "confirmed" && !isPast && (
+                                    <DropdownMenuItem
+                                      onClick={() => updateAppointmentStatus(appointment.id, "completed")}
+                                    >
+                                      <CheckCircle className="mr-2 h-4 w-4" />
+                                      Mark Complete
+                                    </DropdownMenuItem>
+                                  )}
+                                  <DropdownMenuItem
+                                    onClick={() => openDeleteDialog(appointment)}
+                                    className="text-red-600"
+                                  >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Cancel
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )
+                  })}
                 </div>
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Status</Label>
-                  <Badge className={getStatusColor(selectedAppointment.status)}>{selectedAppointment.status}</Badge>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Artist</Label>
-                  <p className="text-sm">{getArtistById(selectedAppointment.artistId)?.name}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Service</Label>
-                  <p className="text-sm">{selectedAppointment.service}</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Date</Label>
-                  <p className="text-sm">{formatDate(selectedAppointment.date)}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Time</Label>
-                  <p className="text-sm">
-                    {formatTime(selectedAppointment.startTime)} -{" "}
-                    {formatTime(selectedAppointment.startTime + selectedAppointment.duration)}
-                  </p>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Duration</Label>
-                  <p className="text-sm">
-                    {selectedAppointment.duration} hour{selectedAppointment.duration !== 1 ? "s" : ""}
-                  </p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Price</Label>
-                  <p className="text-sm font-semibold">${selectedAppointment.price}</p>
-                </div>
-              </div>
-              {selectedAppointment.depositPaid && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-sm font-medium text-muted-foreground">Deposit Paid</Label>
-                    <p className="text-sm">${selectedAppointment.depositPaid}</p>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium text-muted-foreground">Balance Due</Label>
-                    <p className="text-sm font-semibold">
-                      ${(selectedAppointment.price || 0) - (selectedAppointment.depositPaid || 0)}
-                    </p>
-                  </div>
-                </div>
-              )}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Phone</Label>
-                  <p className="text-sm">{selectedAppointment.phone}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Email</Label>
-                  <p className="text-sm">{selectedAppointment.email || "Not provided"}</p>
-                </div>
-              </div>
-              {selectedAppointment.notes && (
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Notes</Label>
-                  <p className="text-sm mt-1 p-2 bg-gray-50 rounded">{selectedAppointment.notes}</p>
-                </div>
-              )}
-              <div>
-                <Label className="text-sm font-medium text-muted-foreground">Booked On</Label>
-                <p className="text-sm">{new Date(selectedAppointment.createdAt).toLocaleString()}</p>
-              </div>
-            </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+
+          {filteredAppointments.length === 0 && (
+            <Card>
+              <CardContent className="p-12 text-center">
+                <Calendar className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No appointments found</h3>
+                <p className="text-muted-foreground mb-4">
+                  {searchTerm || statusFilter !== "all" || artistFilter !== "all" || dateFilter !== "all"
+                    ? "Try adjusting your filters to see more results."
+                    : "No appointments have been scheduled yet."}
+                </p>
+                <Button asChild>
+                  <a href="/schedule">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Schedule Appointment
+                  </a>
+                </Button>
+              </CardContent>
+            </Card>
           )}
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setIsViewDialogOpen(false)}>
-              Close
-            </Button>
-            {selectedAppointment && (
-              <Button
-                onClick={() => {
-                  setIsViewDialogOpen(false)
-                  openEditDialog(selectedAppointment)
-                }}
-              >
-                Edit Appointment
-              </Button>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
 
-      {/* Edit Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Edit Appointment</DialogTitle>
-            <DialogDescription>Update appointment details.</DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="edit-client">Client Name</Label>
-                <Input
-                  id="edit-client"
-                  value={formData.client || ""}
-                  onChange={(e) => setFormData({ ...formData, client: e.target.value })}
-                />
+          {/* View Appointment Dialog */}
+          <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+            <DialogContent className="sm:max-w-[500px]">
+              <DialogHeader>
+                <DialogTitle>Appointment Details</DialogTitle>
+                <DialogDescription>View complete appointment information</DialogDescription>
+              </DialogHeader>
+              {selectedAppointment && (
+                <div className="grid gap-4 py-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Client</Label>
+                      <p className="text-sm font-semibold">{selectedAppointment.client}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Status</Label>
+                      <Badge className={getStatusColor(selectedAppointment.status)}>
+                        {selectedAppointment.status}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Artist</Label>
+                      <p className="text-sm">{getArtistById(selectedAppointment.artist_id)?.name}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Service</Label>
+                      <p className="text-sm">{selectedAppointment.service}</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Date</Label>
+                      <p className="text-sm">{formatDate(selectedAppointment.date)}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Time</Label>
+                      <p className="text-sm">
+                        {formatTime(selectedAppointment.start_time)} -{" "}
+                        {formatTime(selectedAppointment.start_time + selectedAppointment.duration)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Duration</Label>
+                      <p className="text-sm">
+                        {selectedAppointment.duration} hour{selectedAppointment.duration !== 1 ? "s" : ""}
+                      </p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Price</Label>
+                      <p className="text-sm font-semibold">${selectedAppointment.price}</p>
+                    </div>
+                  </div>
+                  {selectedAppointment.deposit_paid && (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-sm font-medium text-muted-foreground">Deposit Paid</Label>
+                        <p className="text-sm">${selectedAppointment.deposit_paid}</p>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium text-muted-foreground">Balance Due</Label>
+                        <p className="text-sm font-semibold">
+                          ${(selectedAppointment.price || 0) - (selectedAppointment.deposit_paid || 0)}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Phone</Label>
+                      <p className="text-sm">{selectedAppointment.phone}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Email</Label>
+                      <p className="text-sm">{selectedAppointment.email || "Not provided"}</p>
+                    </div>
+                  </div>
+                  {selectedAppointment.notes && (
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Notes</Label>
+                      <p className="text-sm mt-1 p-2 bg-gray-50 rounded">{selectedAppointment.notes}</p>
+                    </div>
+                  )}
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Booked On</Label>
+                    <p className="text-sm">{new Date(selectedAppointment.created_at).toLocaleString()}</p>
+                  </div>
+                </div>
+              )}
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setIsViewDialogOpen(false)}>
+                  Close
+                </Button>
+                {selectedAppointment && (
+                  <Button
+                    onClick={() => {
+                      setIsViewDialogOpen(false)
+                      openEditDialog(selectedAppointment)
+                    }}
+                  >
+                    Edit Appointment
+                  </Button>
+                )}
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="edit-phone">Phone</Label>
-                <Input
-                  id="edit-phone"
-                  value={formData.phone || ""}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="edit-service">Service</Label>
-              <Select
-                value={formData.service || ""}
-                onValueChange={(value) => setFormData({ ...formData, service: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {services.map((service) => (
-                    <SelectItem key={service.id} value={service.name}>
-                      {service.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="edit-price">Price ($)</Label>
-                <Input
-                  id="edit-price"
-                  type="number"
-                  value={formData.price || ""}
-                  onChange={(e) => setFormData({ ...formData, price: Number.parseInt(e.target.value) })}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="edit-status">Status</Label>
-                <Select
-                  value={formData.status || ""}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, status: value as "confirmed" | "pending" | "cancelled" | "completed" })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="confirmed">Confirmed</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="cancelled">Cancelled</SelectItem>
-                    <SelectItem value="completed">Completed</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="edit-notes">Notes</Label>
-              <Textarea
-                id="edit-notes"
-                value={formData.notes || ""}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              />
-            </div>
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleEditAppointment}>Save Changes</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+            </DialogContent>
+          </Dialog>
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Cancel Appointment</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to cancel the appointment for {selectedAppointment?.client}? This action cannot be
-              undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Keep Appointment</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteAppointment} className="bg-red-600 hover:bg-red-700">
-              Cancel Appointment
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+          {/* Edit Dialog */}
+          <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+            <DialogContent className="sm:max-w-[500px]">
+              <DialogHeader>
+                <DialogTitle>Edit Appointment</DialogTitle>
+                <DialogDescription>Update appointment details.</DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-client">Client Name</Label>
+                    <Input
+                      id="edit-client"
+                      value={formData.client || ""}
+                      onChange={(e) => setFormData({ ...formData, client: e.target.value })}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-phone">Phone</Label>
+                    <Input
+                      id="edit-phone"
+                      value={formData.phone || ""}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-service">Service</Label>
+                  <Select
+                    value={formData.service || ""}
+                    onValueChange={(value) => setFormData({ ...formData, service: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {services.map((service) => (
+                        <SelectItem key={service.id} value={service.name}>
+                          {service.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-price">Price ($)</Label>
+                    <Input
+                      id="edit-price"
+                      type="number"
+                      value={formData.price || ""}
+                      onChange={(e) => setFormData({ ...formData, price: Number.parseInt(e.target.value) })}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-status">Status</Label>
+                    <Select
+                      value={formData.status || ""}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, status: value as "confirmed" | "pending" | "cancelled" | "completed" })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="confirmed">Confirmed</SelectItem>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                        <SelectItem value="completed">Completed</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-notes">Notes</Label>
+                  <Textarea
+                    id="edit-notes"
+                    value={formData.notes || ""}
+                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleEditAppointment}>Save Changes</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Delete Confirmation Dialog */}
+          <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Cancel Appointment</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to cancel the appointment for {selectedAppointment?.client}? This action cannot
+                  be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Keep Appointment</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteAppointment} className="bg-red-600 hover:bg-red-700">
+                  Cancel Appointment
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </>
+      )}
     </div>
   )
 }
