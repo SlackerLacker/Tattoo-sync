@@ -1,35 +1,41 @@
+import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { createServerClient } from "@supabase/ssr";
 
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next();
 
-  // ✅ 1. Prevent redirect loops for _next, static files, or favicon/api
-  const pathname = req.nextUrl.pathname;
-  const isAsset = pathname.startsWith("/_next")
-               || pathname.startsWith("/favicon.ico")
-               || pathname.startsWith("/icon")
-               || pathname.startsWith("/images")
-               || pathname.startsWith("/fonts")
-               || pathname.startsWith("/api")
-               || pathname.endsWith(".js") // critical for chunks
-               || pathname.endsWith(".css");
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  if (isAsset) return res;
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.error("ERROR: NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY environment variables are not set.");
+    // We can't do much without the credentials, but we'll let the request pass through
+    // and let the page component handle the error.
+    return res;
+  }
 
-  // ✅ 2. Create supabase client
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
-        get: (name) => req.cookies.get(name)?.value,
-        set: (name, value, options) => {
-          res.cookies.set({ name, value, ...options });
+        get(name: string) {
+          return req.cookies.get(name)?.value;
         },
-        remove: (name, options) => {
-          res.cookies.set({ name, value: "", ...options });
+        set(name: string, value: string, options) {
+          res.cookies.set({
+            name,
+            value,
+            ...options,
+          });
+        },
+        remove(name: string, options) {
+          res.cookies.set({
+            name,
+            value: "",
+            ...options,
+          });
         },
       },
     }
@@ -39,11 +45,11 @@ export async function middleware(req: NextRequest) {
     data: { session },
   } = await supabase.auth.getSession();
 
+  const pathname = req.nextUrl.pathname;
   const isAuth = !!session;
   const publicPaths = ["/login", "/signup"];
   const isPublic = publicPaths.includes(pathname);
 
-  // ✅ 3. Handle redirects correctly
   if (!isAuth && !isPublic) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
@@ -54,3 +60,16 @@ export async function middleware(req: NextRequest) {
 
   return res;
 }
+
+export const config = {
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * Feel free to modify this pattern to include more paths.
+     */
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+  ],
+};

@@ -86,31 +86,31 @@ export default function AppointmentsPage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [formData, setFormData] = useState<Partial<Appointment>>({})
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true)
-      try {
-        const { data: appointmentsData, error: appointmentsError } = await supabase
-          .from("appointments")
-          .select("*")
-        if (appointmentsError) throw appointmentsError
-        setAppointments(appointmentsData || [])
+  const fetchData = async () => {
+    setLoading(true)
+    try {
+      const { data: appointmentsData, error: appointmentsError } = await supabase
+        .from("appointments")
+        .select("*")
+      if (appointmentsError) throw appointmentsError
+      setAppointments(appointmentsData || [])
 
-        const { data: artistsData, error: artistsError } = await supabase.from("artists").select("*")
-        if (artistsError) throw artistsError
-        setArtists(artistsData || [])
+      const { data: artistsData, error: artistsError } = await supabase.from("artists").select("*")
+      if (artistsError) throw artistsError
+      setArtists(artistsData || [])
 
-        const { data: servicesData, error: servicesError } = await supabase.from("services").select("*")
-        if (servicesError) throw servicesError
-        setServices(servicesData || [])
-      } catch (error) {
-        console.error("Error fetching data:", error)
-        // Optionally, show a toast or error message to the user
-      } finally {
-        setLoading(false)
-      }
+      const { data: servicesData, error: servicesError } = await supabase.from("services").select("*")
+      if (servicesError) throw servicesError
+      setServices(servicesData || [])
+    } catch (error) {
+      console.error("Error fetching data:", error)
+      // Optionally, show a toast or error message to the user
+    } finally {
+      setLoading(false)
     }
+  }
 
+  useEffect(() => {
     fetchData()
   }, [])
 
@@ -251,12 +251,7 @@ export default function AppointmentsPage() {
 
         if (error) throw error
 
-        // Refresh data
-        const { data: appointmentsData, error: appointmentsError } = await supabase
-          .from("appointments")
-          .select("*")
-        if (appointmentsError) throw appointmentsError
-        setAppointments(appointmentsData || [])
+        await fetchData() // Refresh data
 
         setIsEditDialogOpen(false)
         setFormData({})
@@ -305,6 +300,23 @@ export default function AppointmentsPage() {
       console.error("Error updating status:", error)
       // Optionally, show an error toast
     }
+  }
+
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    return (
+      <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed shadow-sm">
+        <div className="flex flex-col items-center gap-1 text-center">
+          <h3 className="text-2xl font-bold tracking-tight">Configuration Error</h3>
+          <p className="text-sm text-muted-foreground">
+            Supabase environment variables are not set. Please create a <code>.env.local</code> file in the root of
+            your project and add your Supabase URL and anon key.
+          </p>
+          <a href="https://supabase.com/docs/guides/getting-started/tutorials/with-nextjs#get-the-api-keys" target="_blank" rel="noreferrer">
+            <Button className="mt-4">View Supabase Docs</Button>
+          </a>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -784,8 +796,8 @@ export default function AppointmentsPage() {
               <AlertDialogHeader>
                 <AlertDialogTitle>Cancel Appointment</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Are you sure you want to cancel the appointment for {selectedAppointment?.client}? This action cannot
-                  be undone.
+                  Are you sure you want to cancel the appointment for {selectedAppointment?.client}? This action cannot be
+                  undone.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
