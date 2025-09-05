@@ -6,7 +6,8 @@ import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Textarea, Input } from "@/components/ui/textarea"
+import { Textarea } from "@/components/ui/textarea"
+import { Input } from "@/components/ui/input"
 import {
   ArrowLeft,
   Send,

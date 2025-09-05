@@ -8,6 +8,8 @@ export async function middleware(req: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
+  console.log(`Supabase URL: ${supabaseUrl}`);
+
   if (!supabaseUrl || !supabaseAnonKey) {
     console.error("ERROR: NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY environment variables are not set.");
     // We can't do much without the credentials, but we'll let the request pass through
@@ -41,21 +43,25 @@ export async function middleware(req: NextRequest) {
     }
   );
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
 
-  const pathname = req.nextUrl.pathname;
-  const isAuth = !!session;
-  const publicPaths = ["/login", "/signup"];
-  const isPublic = publicPaths.includes(pathname);
+    const pathname = req.nextUrl.pathname;
+    const isAuth = !!session;
+    const publicPaths = ["/login", "/signup"];
+    const isPublic = publicPaths.includes(pathname);
 
-  if (!isAuth && !isPublic) {
-    return NextResponse.redirect(new URL("/login", req.url));
-  }
+    if (!isAuth && !isPublic) {
+      return NextResponse.redirect(new URL("/login", req.url));
+    }
 
-  if (isAuth && isPublic) {
-    return NextResponse.redirect(new URL("/dashboard", req.url));
+    if (isAuth && isPublic) {
+      return NextResponse.redirect(new URL("/dashboard", req.url));
+    }
+  } catch (error) {
+    console.error("Error in middleware while getting session:", error);
   }
 
   return res;

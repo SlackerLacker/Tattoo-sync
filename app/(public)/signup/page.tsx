@@ -1,13 +1,16 @@
 "use client"
 import { useState } from "react"
-import { supabase } from "@/lib/supabase"
+import { useSupabase } from "@/lib/useSupabase"
 import { useRouter } from "next/navigation"
+
+export const dynamic = 'force-dynamic'
 
     export default function SignUp() {
     const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")
     const [error, setError] = useState("")
     const router = useRouter()
+    const supabase = useSupabase()
 
     const handleSignUp = async () => {
         setError("") // Clear previous errors

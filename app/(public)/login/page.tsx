@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase-browser";
+import { useSupabase } from "@/lib/useSupabase";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+
+export const dynamic = 'force-dynamic'
 
 export default function LoginPage() {
   console.log("Login Page rendered");
@@ -12,6 +14,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const router = useRouter();
+  const supabase = useSupabase();
 
   const handleLogin = async () => {
     setError("");

@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase-browser"; // or "@/lib/supabase" if you prefer the generic client
+import { useSupabase } from "@/lib/useSupabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+
+export const dynamic = 'force-dynamic'
 
 type Profile = {
   id: string;
@@ -34,6 +36,7 @@ export default function AdminDashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [authorized, setAuthorized] = useState(false);
   const router = useRouter();
+  const supabase = useSupabase();
 
   useEffect(() => {
     const init = async () => {
