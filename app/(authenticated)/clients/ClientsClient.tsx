@@ -59,11 +59,11 @@ export default function ClientsClient({ clients: initialClients }: ClientsClient
     }
   }
 
-  const filteredClients = clients.filter(
+  const filteredClients = (clients || []).filter(
     (client) =>
-      client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      client.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      client.phone.includes(searchTerm),
+      (client.full_name && client.full_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (client.email && client.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (client.phone && client.phone.includes(searchTerm)),
   )
 
   const resetForm = () => {
@@ -303,13 +303,13 @@ export default function ClientsClient({ clients: initialClients }: ClientsClient
                 <div className="flex items-center gap-4">
                   <Avatar className="h-12 w-12">
                     <AvatarImage
-                      src={`/placeholder.svg?height=48&width=48&text=${client.name
+                      src={`/placeholder.svg?height=48&width=48&text=${client.full_name
                         .split(" ")
                         .map((n) => n[0])
                         .join("")}`}
                     />
                     <AvatarFallback>
-                      {client.name
+                      {client.full_name
                         .split(" ")
                         .map((n) => n[0])
                         .join("")}
@@ -317,7 +317,7 @@ export default function ClientsClient({ clients: initialClients }: ClientsClient
                   </Avatar>
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <h3 className="font-semibold">{client.name}</h3>
+                      <h3 className="font-semibold">{client.full_name}</h3>
                       <Badge className={getStatusColor(client.status)}>{client.status}</Badge>
                     </div>
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
@@ -525,8 +525,8 @@ export default function ClientsClient({ clients: initialClients }: ClientsClient
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Client</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete {selectedClient?.name}? This action cannot be undone and will remove all
-              associated appointment history and data.
+              Are you sure you want to delete {selectedClient?.full_name}? This action cannot be undone and will remove
+              all associated appointment history and data.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
