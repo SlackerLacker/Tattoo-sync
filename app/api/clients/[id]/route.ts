@@ -2,14 +2,12 @@ import { createServerSupabase } from "@/lib/supabase/server-client"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: Request) {
   const cookieStore = await cookies()
   const supabase = createServerSupabase(cookieStore)
-  const { data: client, error } = await supabase
-    .from("clients")
-    .select("*")
-    .eq("id", params.id)
-    .single()
+  const id = request.url.split("/").pop()
+
+  const { data: client, error } = await supabase.from("clients").select("*").eq("id", id).single()
 
   if (error) {
     return new NextResponse(error.message, { status: 500 })
@@ -18,9 +16,10 @@ export async function GET(request: Request, { params }: { params: { id: string }
   return NextResponse.json(client)
 }
 
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
+export async function PUT(request: Request) {
   const cookieStore = await cookies()
   const supabase = createServerSupabase(cookieStore)
+  const id = request.url.split("/").pop()
 
   const clientData = await request.json()
   if (clientData.name) {
@@ -28,11 +27,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     delete clientData.name
   }
 
-  const { data: client, error } = await supabase
-    .from("clients")
-    .update(clientData)
-    .eq("id", params.id)
-    .select()
+  const { data: client, error } = await supabase.from("clients").update(clientData).eq("id", id).select()
 
   if (error) {
     return new NextResponse(error.message, { status: 500 })
@@ -41,10 +36,12 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   return NextResponse.json(client)
 }
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request) {
   const cookieStore = await cookies()
   const supabase = createServerSupabase(cookieStore)
-  const { data: client, error } = await supabase.from("clients").delete().eq("id", params.id)
+  const id = request.url.split("/").pop()
+
+  const { data: client, error } = await supabase.from("clients").delete().eq("id", id)
 
   if (error) {
     return new NextResponse(error.message, { status: 500 })
