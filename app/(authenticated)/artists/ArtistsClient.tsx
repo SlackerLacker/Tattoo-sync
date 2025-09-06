@@ -253,7 +253,7 @@ export default function ArtistsClient({ artists: initialArtists }: ArtistsClient
                 </div>
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="specialty">Specialties *</Label>
+                <Label htmlFor="specialty">Specialties</Label>
                 <div className="flex flex-wrap gap-2 p-2 border rounded-md min-h-[40px]">
                   {((formData.specialty as string[]) || []).map((spec, index) => (
                     <Badge key={index} variant="secondary" className="flex items-center gap-1">
