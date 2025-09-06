@@ -2,14 +2,12 @@ import { createServerSupabase } from "@/lib/supabase/server-client"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: Request) {
   const cookieStore = await cookies()
   const supabase = createServerSupabase(cookieStore)
-  const { data: artist, error } = await supabase
-    .from("artists")
-    .select("*")
-    .eq("id", params.id)
-    .single()
+  const id = request.url.split("/").pop()
+
+  const { data: artist, error } = await supabase.from("artists").select("*").eq("id", id).single()
 
   if (error) {
     return new NextResponse(error.message, { status: 500 })
@@ -18,13 +16,16 @@ export async function GET(request: Request, { params }: { params: { id: string }
   return NextResponse.json(artist)
 }
 
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
+export async function PUT(request: Request) {
   const cookieStore = await cookies()
   const supabase = createServerSupabase(cookieStore)
+  const id = request.url.split("/").pop()
+
   const { data: artist, error } = await supabase
     .from("artists")
     .update(await request.json())
-    .eq("id", params.id)
+    .eq("id", id)
+    .select()
 
   if (error) {
     return new NextResponse(error.message, { status: 500 })
@@ -33,10 +34,12 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   return NextResponse.json(artist)
 }
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request) {
   const cookieStore = await cookies()
   const supabase = createServerSupabase(cookieStore)
-  const { data: artist, error } = await supabase.from("artists").delete().eq("id", params.id)
+  const id = request.url.split("/").pop()
+
+  const { data: artist, error } = await supabase.from("artists").delete().eq("id", id)
 
   if (error) {
     return new NextResponse(error.message, { status: 500 })
