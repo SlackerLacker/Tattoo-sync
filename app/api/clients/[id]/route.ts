@@ -21,10 +21,18 @@ export async function GET(request: Request, { params }: { params: { id: string }
 export async function PUT(request: Request, { params }: { params: { id: string } }) {
   const cookieStore = await cookies()
   const supabase = createServerSupabase(cookieStore)
+
+  const clientData = await request.json()
+  if (clientData.name) {
+    clientData.full_name = clientData.name
+    delete clientData.name
+  }
+
   const { data: client, error } = await supabase
     .from("clients")
-    .update(await request.json())
+    .update(clientData)
     .eq("id", params.id)
+    .select()
 
   if (error) {
     return new NextResponse(error.message, { status: 500 })

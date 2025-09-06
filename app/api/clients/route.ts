@@ -43,7 +43,7 @@ export async function POST(request: Request) {
     delete clientData.name
   }
 
-  const { data: client, error } = await supabase.from("clients").insert([clientData])
+  const { data: client, error } = await supabase.from("clients").insert([clientData]).select()
 
   if (error) {
     console.error("Supabase insert error:", error)
