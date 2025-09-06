@@ -18,21 +18,25 @@ export async function POST(request: Request) {
   const cookieStore = await cookies()
   const supabase = createServerSupabase(cookieStore)
 
-  // --- Start Debugging ---
   const {
     data: { user },
-    error: userError,
   } = await supabase.auth.getUser()
-
-  if (userError || !user) {
-    console.error("Error getting user or no user found:", userError)
+  if (!user) {
     return new NextResponse("User not authenticated", { status: 401 })
   }
-  console.log("Authenticated user ID:", user.id)
+
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("studio_id")
+    .eq("id", user.id)
+    .single()
+
+  if (profileError || !profile) {
+    return new NextResponse("User profile not found", { status: 404 })
+  }
 
   const clientData = await request.json()
-  console.log("Incoming client data:", clientData)
-  // --- End Debugging ---
+  clientData.studio_id = profile.studio_id
 
   if (clientData.name) {
     clientData.full_name = clientData.name
