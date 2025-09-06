@@ -244,7 +244,7 @@ export default function ClientsClient({ clients: initialClients }: ClientsClient
               <User className="h-4 w-4 text-blue-600" />
               <span className="text-sm font-medium">Total Clients</span>
             </div>
-            <p className="text-2xl font-bold mt-2">{clients.length}</p>
+            <p className="text-2xl font-bold mt-2">{(clients || []).length}</p>
           </CardContent>
         </Card>
         <Card>
@@ -253,7 +253,9 @@ export default function ClientsClient({ clients: initialClients }: ClientsClient
               <div className="w-3 h-3 bg-green-500 rounded-full" />
               <span className="text-sm font-medium">Active</span>
             </div>
-            <p className="text-2xl font-bold mt-2">{clients.filter((c) => c.status === "active").length}</p>
+            <p className="text-2xl font-bold mt-2">
+              {(clients || []).filter((c) => (c.status || "new") === "active").length}
+            </p>
           </CardContent>
         </Card>
         <Card>
@@ -262,7 +264,9 @@ export default function ClientsClient({ clients: initialClients }: ClientsClient
               <div className="w-3 h-3 bg-blue-500 rounded-full" />
               <span className="text-sm font-medium">New Clients</span>
             </div>
-            <p className="text-2xl font-bold mt-2">{clients.filter((c) => c.status === "new").length}</p>
+            <p className="text-2xl font-bold mt-2">
+              {(clients || []).filter((c) => (c.status || "new") === "new").length}
+            </p>
           </CardContent>
         </Card>
         <Card>
@@ -272,7 +276,7 @@ export default function ClientsClient({ clients: initialClients }: ClientsClient
               <span className="text-sm font-medium">Total Revenue</span>
             </div>
             <p className="text-2xl font-bold mt-2">
-              ${clients.reduce((sum, c) => sum + c.totalSpent, 0).toLocaleString()}
+              ${(clients || []).reduce((sum, c) => sum + (c.totalSpent || 0), 0).toLocaleString()}
             </p>
           </CardContent>
         </Card>
@@ -318,7 +322,7 @@ export default function ClientsClient({ clients: initialClients }: ClientsClient
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <h3 className="font-semibold">{client.full_name}</h3>
-                      <Badge className={getStatusColor(client.status)}>{client.status}</Badge>
+                      <Badge className={getStatusColor(client.status || "new")}>{client.status || "new"}</Badge>
                     </div>
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
                       <div className="flex items-center gap-1">
@@ -343,16 +347,18 @@ export default function ClientsClient({ clients: initialClients }: ClientsClient
                       </div>
                       <div className="flex items-center gap-1">
                         <Calendar className="h-3 w-3" />
-                        Next: {client.nextAppointment}
+                        Next: {client.nextAppointment || "N/A"}
                       </div>
                     </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="text-right">
-                    <p className="text-sm font-medium">{client.totalAppointments} appointments</p>
-                    <p className="text-xs text-muted-foreground">Spent: ${client.totalSpent.toLocaleString()}</p>
-                    <p className="text-xs text-muted-foreground">Joined: {client.joinDate}</p>
+                    <p className="text-sm font-medium">{client.totalAppointments || 0} appointments</p>
+                    <p className="text-xs text-muted-foreground">
+                      Spent: ${(client.totalSpent || 0).toLocaleString()}
+                    </p>
+                    <p className="text-xs text-muted-foreground">Joined: {client.joinDate || "N/A"}</p>
                   </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
