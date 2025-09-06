@@ -3,7 +3,7 @@ import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 
 export async function GET() {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const supabase = createServerSupabase(cookieStore)
   const { data: services, error } = await supabase.from("services").select("*")
 
@@ -15,7 +15,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const supabase = createServerSupabase(cookieStore)
   const { data: service, error } = await supabase.from("services").insert([await request.json()])
 

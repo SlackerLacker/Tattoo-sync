@@ -3,7 +3,7 @@ import { cookies } from "next/headers"
 import ClientsClient from "./ClientsClient"
 
 export default async function ClientsPage() {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const supabase = createServerSupabase(cookieStore)
   const { data: clients } = await supabase.from("clients").select("*")
 

@@ -3,7 +3,7 @@ import { cookies } from "next/headers"
 import ServicesClient from "./ServicesClient"
 
 export default async function ServicesPage() {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const supabase = createServerSupabase(cookieStore)
   const { data: services } = await supabase.from("services").select("*")
 

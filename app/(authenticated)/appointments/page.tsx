@@ -3,7 +3,7 @@ import { cookies } from "next/headers"
 import AppointmentsClient from "./AppointmentsClient"
 
 export default async function AppointmentsPage() {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const supabase = createServerSupabase(cookieStore)
   const { data: appointments } = await supabase.from("appointments").select("*")
   const { data: artists } = await supabase.from("artists").select("*")
