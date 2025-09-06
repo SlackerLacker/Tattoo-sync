@@ -17,7 +17,14 @@ export async function GET() {
 export async function POST(request: Request) {
   const cookieStore = await cookies()
   const supabase = createServerSupabase(cookieStore)
-  const { data: client, error } = await supabase.from("clients").insert([await request.json()])
+
+  const clientData = await request.json()
+  if (clientData.name) {
+    clientData.full_name = clientData.name
+    delete clientData.name
+  }
+
+  const { data: client, error } = await supabase.from("clients").insert([clientData])
 
   if (error) {
     console.error(error)
