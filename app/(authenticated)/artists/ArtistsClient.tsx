@@ -89,7 +89,7 @@ export default function ArtistsClient({ artists: initialArtists }: ArtistsClient
   }
 
   const handleAddArtist = async () => {
-    if (formData.name && formData.email && formData.specialty) {
+    if (formData.name && formData.email) {
       const response = await fetch("/api/artists", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
