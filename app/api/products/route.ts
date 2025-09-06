@@ -3,22 +3,22 @@ import { NextResponse } from "next/server"
 
 export async function GET() {
   const supabase = await createServerSupabase()
-  const { data: clients, error } = await supabase.from("clients").select("*")
+  const { data: products, error } = await supabase.from("products").select("*")
 
   if (error) {
     return new NextResponse(error.message, { status: 500 })
   }
 
-  return NextResponse.json(clients)
+  return NextResponse.json(products)
 }
 
 export async function POST(request: Request) {
   const supabase = await createServerSupabase()
-  const { data: client, error } = await supabase.from("clients").insert([await request.json()])
+  const { data: product, error } = await supabase.from("products").insert([await request.json()])
 
   if (error) {
     return new NextResponse(error.message, { status: 500 })
   }
 
-  return NextResponse.json(client)
+  return NextResponse.json(product)
 }
