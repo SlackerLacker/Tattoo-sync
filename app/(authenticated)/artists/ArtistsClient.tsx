@@ -319,7 +319,7 @@ export default function ArtistsClient({ artists: initialArtists }: ArtistsClient
               <User className="h-4 w-4 text-blue-600" />
               <span className="text-sm font-medium">Total Artists</span>
             </div>
-            <p className="text-2xl font-bold mt-2">{artists.length}</p>
+            <p className="text-2xl font-bold mt-2">{(artists || []).length}</p>
           </CardContent>
         </Card>
         <Card>
@@ -328,7 +328,9 @@ export default function ArtistsClient({ artists: initialArtists }: ArtistsClient
               <div className="w-3 h-3 bg-green-500 rounded-full" />
               <span className="text-sm font-medium">Active</span>
             </div>
-            <p className="text-2xl font-bold mt-2">{artists.filter((a) => a.status === "active").length}</p>
+            <p className="text-2xl font-bold mt-2">
+              {(artists || []).filter((a) => (a.status || "active") === "active").length}
+            </p>
           </CardContent>
         </Card>
         <Card>
@@ -338,7 +340,9 @@ export default function ArtistsClient({ artists: initialArtists }: ArtistsClient
               <span className="text-sm font-medium">Avg Rating</span>
             </div>
             <p className="text-2xl font-bold mt-2">
-              {(artists.reduce((sum, a) => sum + a.rating, 0) / artists.length).toFixed(1)}
+              {((artists || []).reduce((sum, a) => sum + (a.rating || 0), 0) / ((artists || []).length || 1)).toFixed(
+                1,
+              )}
             </p>
           </CardContent>
         </Card>
@@ -350,7 +354,10 @@ export default function ArtistsClient({ artists: initialArtists }: ArtistsClient
             </div>
             <p className="text-2xl font-bold mt-2">
               {formatNumber(
-                artists.reduce((sum, a) => sum + a.socialAccounts.reduce((acc, s) => acc + s.followers, 0), 0),
+                (artists || []).reduce(
+                  (sum, a) => sum + (a.socialAccounts || []).reduce((acc, s) => acc + (s.followers || 0), 0),
+                  0,
+                ),
               )}
             </p>
           </CardContent>
@@ -359,7 +366,7 @@ export default function ArtistsClient({ artists: initialArtists }: ArtistsClient
 
       {/* Artists Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {artists.map((artist) => (
+        {(artists || []).map((artist) => (
           <Card key={artist.id} className="relative overflow-hidden hover:shadow-lg transition-shadow">
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between">
@@ -368,7 +375,7 @@ export default function ArtistsClient({ artists: initialArtists }: ArtistsClient
                     <Avatar className="h-16 w-16">
                       <AvatarImage src={artist.profileImage || "/placeholder.svg"} />
                       <AvatarFallback className="text-lg">
-                        {artist.name
+                        {(artist.name || "A")
                           .split(" ")
                           .map((n) => n[0])
                           .join("")}
@@ -376,38 +383,42 @@ export default function ArtistsClient({ artists: initialArtists }: ArtistsClient
                     </Avatar>
                     <div
                       className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-white ${
-                        artist.status === "active"
+                        (artist.status || "active") === "active"
                           ? "bg-green-500"
-                          : artist.status === "on-leave"
+                          : (artist.status || "active") === "on-leave"
                             ? "bg-yellow-500"
                             : "bg-red-500"
                       }`}
                     />
                   </div>
                   <div>
-                    <CardTitle className="text-lg">{artist.name}</CardTitle>
+                    <CardTitle className="text-lg">{artist.name || "New Artist"}</CardTitle>
                     <CardDescription>
-                      {artist.experience} • {artist.location}
+                      {artist.experience || "N/A"} • {artist.location || "N/A"}
                     </CardDescription>
                     <div className="flex items-center gap-1 mt-1">
                       <div className="flex">
                         {[...Array(5)].map((_, i) => (
                           <div
                             key={i}
-                            className={`w-3 h-3 ${i < Math.floor(artist.rating) ? "text-yellow-400" : "text-gray-300"}`}
+                            className={`w-3 h-3 ${
+                              i < Math.floor(artist.rating || 0) ? "text-yellow-400" : "text-gray-300"
+                            }`}
                           >
                             ★
                           </div>
                         ))}
                       </div>
                       <span className="text-xs text-muted-foreground">
-                        {artist.rating} ({artist.totalReviews} reviews)
+                        {(artist.rating || 0).toFixed(1)} ({artist.totalReviews || 0} reviews)
                       </span>
                     </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge className={getStatusColor(artist.status)}>{artist.status.replace("-", " ")}</Badge>
+                  <Badge className={getStatusColor(artist.status || "active")}>
+                    {(artist.status || "active").replace("-", " ")}
+                  </Badge>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="sm">
@@ -427,7 +438,7 @@ export default function ArtistsClient({ artists: initialArtists }: ArtistsClient
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => toggleArtistStatus(artist.id)}>
                         <User className="mr-2 h-4 w-4" />
-                        {artist.status === "active" ? "Deactivate" : "Activate"}
+                        {(artist.status || "active") === "active" ? "Deactivate" : "Activate"}
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => openDeleteDialog(artist)} className="text-red-600">
                         <Trash2 className="mr-2 h-4 w-4" />
@@ -440,14 +451,14 @@ export default function ArtistsClient({ artists: initialArtists }: ArtistsClient
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex flex-wrap gap-1">
-                {artist.specialty.slice(0, 3).map((spec, index) => (
+                {(artist.specialty || []).slice(0, 3).map((spec, index) => (
                   <Badge key={index} variant="outline" className="text-xs">
                     {spec}
                   </Badge>
                 ))}
-                {artist.specialty.length > 3 && (
+                {(artist.specialty || []).length > 3 && (
                   <Badge variant="outline" className="text-xs">
-                    +{artist.specialty.length - 3} more
+                    +{(artist.specialty || []).length - 3} more
                   </Badge>
                 )}
               </div>
@@ -465,23 +476,25 @@ export default function ArtistsClient({ artists: initialArtists }: ArtistsClient
                 </div>
                 <div className="flex items-center gap-2 text-sm">
                   <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">Next: {artist.nextAppointment}</span>
+                  <span className="text-muted-foreground">Next: {artist.nextAppointment || "N/A"}</span>
                 </div>
               </div>
 
               {/* Social Media Preview */}
-              {artist.socialAccounts.length > 0 && (
+              {(artist.socialAccounts || []).length > 0 && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-medium text-muted-foreground">Social Media</span>
                   </div>
                   <div className="flex items-center gap-3">
-                    {artist.socialAccounts.slice(0, 3).map((account) => {
+                    {(artist.socialAccounts || []).slice(0, 3).map((account) => {
                       const IconComponent = getSocialIcon(account.platform)
                       return (
                         <div key={account.platform} className="flex items-center gap-1">
                           <IconComponent className={`h-4 w-4 ${getSocialColor(account.platform)}`} />
-                          <span className="text-xs text-muted-foreground">{formatNumber(account.followers)}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {formatNumber(account.followers || 0)}
+                          </span>
                           {account.isConnected && <div className="w-2 h-2 bg-green-500 rounded-full" />}
                         </div>
                       )
@@ -492,10 +505,10 @@ export default function ArtistsClient({ artists: initialArtists }: ArtistsClient
 
               <div className="flex items-center justify-between pt-2 border-t">
                 <div className="text-sm">
-                  <span className="font-medium">{artist.totalAppointments}</span>
+                  <span className="font-medium">{artist.totalAppointments || 0}</span>
                   <span className="text-muted-foreground"> appointments</span>
                 </div>
-                <div className="text-sm font-medium">${artist.hourlyRate}/hr</div>
+                <div className="text-sm font-medium">${artist.hourlyRate || 0}/hr</div>
               </div>
 
               {/* Quick Action Button */}
