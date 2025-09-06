@@ -1,8 +1,10 @@
 import { createServerSupabase } from "@/lib/supabase/server-client"
+import { cookies } from "next/headers"
 import ClientsClient from "./ClientsClient"
 
 export default async function ClientsPage() {
-  const supabase = await createServerSupabase()
+  const cookieStore = cookies()
+  const supabase = createServerSupabase(cookieStore)
   const { data: clients } = await supabase.from("clients").select("*")
 
   return <ClientsClient clients={clients} />
