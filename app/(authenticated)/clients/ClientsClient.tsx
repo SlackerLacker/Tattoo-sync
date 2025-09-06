@@ -45,6 +45,7 @@ export default function ClientsClient({ clients: initialClients }: ClientsClient
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [selectedClient, setSelectedClient] = useState<Client | null>(null)
   const [formData, setFormData] = useState<Partial<Client>>({})
+  const [formError, setFormError] = useState<string | null>(null)
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -69,9 +70,11 @@ export default function ClientsClient({ clients: initialClients }: ClientsClient
   const resetForm = () => {
     setFormData({})
     setSelectedClient(null)
+    setFormError(null)
   }
 
   const handleAddClient = async () => {
+    setFormError(null)
     if (formData.name && formData.email) {
       const response = await fetch("/api/clients", {
         method: "POST",
@@ -83,11 +86,17 @@ export default function ClientsClient({ clients: initialClients }: ClientsClient
         setClients([...clients, newClient[0]])
         setIsAddDialogOpen(false)
         resetForm()
+      } else {
+        const errorMessage = await response.text()
+        setFormError(errorMessage)
       }
+    } else {
+      setFormError("Full Name and Email are required.")
     }
   }
 
   const handleEditClient = async () => {
+    setFormError(null)
     if (selectedClient && formData.name && formData.email) {
       const response = await fetch(`/api/clients/${selectedClient.id}`, {
         method: "PUT",
@@ -99,7 +108,12 @@ export default function ClientsClient({ clients: initialClients }: ClientsClient
         setClients(clients.map((client) => (client.id === selectedClient.id ? updatedClient[0] : client)))
         setIsEditDialogOpen(false)
         resetForm()
+      } else {
+        const errorMessage = await response.text()
+        setFormError(errorMessage)
       }
+    } else {
+      setFormError("Full Name and Email are required.")
     }
   }
 
@@ -119,6 +133,7 @@ export default function ClientsClient({ clients: initialClients }: ClientsClient
   const openEditDialog = (client: Client) => {
     setSelectedClient(client)
     setFormData(client)
+    setFormError(null)
     setIsEditDialogOpen(true)
   }
 
@@ -134,7 +149,15 @@ export default function ClientsClient({ clients: initialClients }: ClientsClient
           <h1 className="text-2xl font-bold tracking-tight">Clients</h1>
           <p className="text-muted-foreground">Manage your client database and information</p>
         </div>
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <Dialog
+          open={isAddDialogOpen}
+          onOpenChange={(open) => {
+            setIsAddDialogOpen(open)
+            if (!open) {
+              resetForm()
+            }
+          }}
+        >
           <DialogTrigger asChild>
             <Button>
               <Plus className="mr-2 h-4 w-4" />
@@ -226,6 +249,7 @@ export default function ClientsClient({ clients: initialClients }: ClientsClient
                 />
               </div>
             </div>
+            {formError && <p className="text-sm text-red-500">{formError}</p>}
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
                 Cancel
@@ -410,7 +434,15 @@ export default function ClientsClient({ clients: initialClients }: ClientsClient
       )}
 
       {/* Edit Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+      <Dialog
+        open={isEditDialogOpen}
+        onOpenChange={(open) => {
+          setIsEditDialogOpen(open)
+          if (!open) {
+            resetForm()
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle>Edit Client</DialogTitle>
@@ -516,6 +548,7 @@ export default function ClientsClient({ clients: initialClients }: ClientsClient
               />
             </div>
           </div>
+          {formError && <p className="text-sm text-red-500">{formError}</p>}
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
               Cancel
