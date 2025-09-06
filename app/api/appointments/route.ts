@@ -1,8 +1,10 @@
 import { createServerSupabase } from "@/lib/supabase/server-client"
+import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 
 export async function GET() {
-  const supabase = await createServerSupabase()
+  const cookieStore = cookies()
+  const supabase = createServerSupabase(cookieStore)
   const { data: appointments, error } = await supabase.from("appointments").select("*")
 
   if (error) {
@@ -13,7 +15,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const supabase = await createServerSupabase()
+  const cookieStore = cookies()
+  const supabase = createServerSupabase(cookieStore)
   const { data: appointment, error } = await supabase.from("appointments").insert([await request.json()])
 
   if (error) {
