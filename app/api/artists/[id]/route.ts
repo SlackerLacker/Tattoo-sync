@@ -7,7 +7,11 @@ export async function GET(request: Request) {
   const supabase = createServerSupabase(cookieStore)
   const id = request.url.split("/").pop()
 
-  const { data: artist, error } = await supabase.from("artists").select("*").eq("id", id).single()
+  const { data: artist, error } = await supabase
+    .from("artists")
+    .select("*, portfolio_pieces(*)")
+    .eq("id", id)
+    .single()
 
   if (error) {
     return new NextResponse(error.message, { status: 500 })
