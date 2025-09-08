@@ -11,6 +11,9 @@ export async function POST(request: Request) {
     const pieceData = await request.json()
     pieceData.artist_id = artistId
 
+    console.log("Attempting to insert portfolio piece with artist_id:", artistId)
+    console.log("Final data for insert:", pieceData)
+
     const { data, error } = await supabase
       .from("portfolio_pieces")
       .insert([pieceData])
