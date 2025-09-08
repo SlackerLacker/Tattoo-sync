@@ -1,22 +1,47 @@
-import { createServerSupabase } from "@/lib/supabase/server-client"
-import { cookies } from "next/headers"
+"use client"
+
+import { useEffect, useState } from "react"
+import { useParams } from "next/navigation"
 import ArtistProfileClient from "./ArtistProfileClient"
-import { notFound } from "next/navigation"
 
-export const dynamic = "force-dynamic"
+export default function ArtistProfilePage() {
+  const params = useParams()
+  const id = params.id
+  const [artist, setArtist] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-export default async function ArtistProfilePage({ params }: { params: { id: string } }) {
-  const cookieStore = await cookies()
-  const supabase = createServerSupabase(cookieStore)
+  useEffect(() => {
+    if (id) {
+      const fetchArtist = async () => {
+        try {
+          setLoading(true)
+          const response = await fetch(`/api/artists/${id}`)
+          if (!response.ok) {
+            throw new Error("Failed to fetch artist data")
+          }
+          const data = await response.json()
+          setArtist(data)
+        } catch (err: any) {
+          setError(err.message)
+        } finally {
+          setLoading(false)
+        }
+      }
+      fetchArtist()
+    }
+  }, [id])
 
-  const { data: artist, error } = await supabase
-    .from("artists")
-    .select("*")
-    .eq("id", params.id)
-    .single()
+  if (loading) {
+    return <div>Loading...</div>
+  }
 
-  if (error || !artist) {
-    notFound()
+  if (error) {
+    return <div>Error: {error}</div>
+  }
+
+  if (!artist) {
+    return <div>Artist not found.</div>
   }
 
   return <ArtistProfileClient artist={artist} />
