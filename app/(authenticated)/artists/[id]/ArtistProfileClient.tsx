@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { supabase } from "@/lib/supabase/browser-client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -55,6 +56,7 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
   const [selectedPlatform, setSelectedPlatform] = useState("")
   const [socialFormData, setSocialFormData] = useState({ username: "", accessToken: "" })
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [formData, setFormData] = useState<Partial<any>>({})
   const [formError, setFormError] = useState<string | null>(null)
@@ -196,6 +198,33 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
     } else {
       const errorMessage = await response.text()
       setFormError(errorMessage)
+    }
+  }
+
+  const handleImageUpload = async (file: File) => {
+    if (!file) return
+    setFormError(null)
+    setIsUploading(true)
+
+    try {
+      const filePath = `${artist.id}/${crypto.randomUUID()}`
+      const { error: uploadError } = await supabase.storage.from("portfolio-images").upload(filePath, file)
+
+      if (uploadError) {
+        throw uploadError
+      }
+
+      const { data: urlData } = supabase.storage.from("portfolio-images").getPublicUrl(filePath)
+
+      if (!urlData.publicUrl) {
+        throw new Error("Could not get public URL for uploaded image.")
+      }
+
+      setNewPieceFormData({ ...newPieceFormData, image_url: urlData.publicUrl })
+    } catch (error: any) {
+      setFormError(error.message)
+    } finally {
+      setIsUploading(false)
     }
   }
 
@@ -954,13 +983,31 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="piece-image_url">Image URL</Label>
+              <Label htmlFor="piece-image_url">Image</Label>
               <Input
                 id="piece-image_url"
-                placeholder="https://example.com/image.jpg"
-                value={newPieceFormData.image_url || ""}
-                onChange={(e) => setNewPieceFormData({ ...newPieceFormData, image_url: e.target.value })}
+                type="file"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files.length > 0) {
+                    handleImageUpload(e.target.files[0])
+                  }
+                }}
+                disabled={isUploading}
               />
+              {isUploading && <p className="text-sm text-muted-foreground">Uploading...</p>}
+              {newPieceFormData.image_url && (
+                <div className="text-sm text-green-600">
+                  <p>Upload successful!</p>
+                  <a
+                    href={newPieceFormData.image_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs underline"
+                  >
+                    View Uploaded Image
+                  </a>
+                </div>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
