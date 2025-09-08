@@ -10,9 +10,7 @@ export async function POST(request: Request) {
   try {
     const pieceData = await request.json()
     pieceData.artist_id = artistId
-
-    console.log("Attempting to insert portfolio piece with artist_id:", artistId)
-    console.log("Final data for insert:", pieceData)
+    pieceData.is_public = true // Ensure the piece is public by default
 
     const { data, error } = await supabase
       .from("portfolio_pieces")
