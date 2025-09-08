@@ -475,7 +475,7 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
                 <Card key={item.id} className="overflow-hidden group">
                   <div className="aspect-square bg-gray-100 relative overflow-hidden">
                     <img
-                      src={item.imageUrl || "/placeholder.svg"}
+                      src={item.image_url || "/placeholder.svg"}
                       alt={item.title}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
