@@ -7,14 +7,29 @@ export async function GET(request: Request) {
   const supabase = createServerSupabase(cookieStore)
   const id = request.url.split("/").pop()
 
-  const { data: artist, error } = await supabase
+  // Step 1: Fetch the artist
+  const { data: artist, error: artistError } = await supabase
     .from("artists")
-    .select("*, portfolio_pieces:portfolio_pieces(*)")
+    .select("*")
     .eq("id", id)
     .single()
 
-  if (error) {
-    return new NextResponse(error.message, { status: 500 })
+  if (artistError || !artist) {
+    return new NextResponse(artistError?.message || "Artist not found", { status: 404 })
+  }
+
+  // Step 2: Fetch the portfolio pieces for that artist
+  const { data: portfolioPieces, error: piecesError } = await supabase
+    .from("portfolio_pieces")
+    .select("*")
+    .eq("artist_id", id)
+
+  if (piecesError) {
+    // Log the error but don't fail the whole request
+    console.error("Error fetching portfolio pieces:", piecesError)
+    artist.portfolio = []
+  } else {
+    artist.portfolio = portfolioPieces
   }
 
   return NextResponse.json(artist)
