@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -39,7 +39,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
-
 const socialPlatforms = {
   instagram: { name: "Instagram", icon: Instagram, color: "text-pink-600", bgColor: "bg-pink-50" },
   facebook: { name: "Facebook", icon: Facebook, color: "text-blue-600", bgColor: "bg-blue-50" },
@@ -56,7 +55,6 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
   const [socialFormData, setSocialFormData] = useState({ username: "", accessToken: "" })
   const [isRefreshing, setIsRefreshing] = useState(false)
 
-
   if (!artist) {
     return <div>Artist not found</div>
   }
@@ -68,6 +66,7 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
   }
 
   const formatDate = (dateString: string) => {
+    if (!dateString) return "N/A"
     return new Date(dateString).toLocaleDateString("en-US", {
       year: "numeric",
       month: "short",
@@ -77,30 +76,24 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
 
   const handleConnectSocial = async () => {
     if (!selectedPlatform || !socialFormData.username) return
-
-    // Simulate API call to connect social media
     setIsRefreshing(true)
-
-    // Mock API response
     setTimeout(() => {
-      const updatedSocialAccounts = artist.socialAccounts.map((account) =>
+      const updatedSocialAccounts = (artist.socialAccounts || []).map((account: any) =>
         account.platform === selectedPlatform
           ? {
               ...account,
               username: socialFormData.username,
               isConnected: true,
               lastSync: new Date().toISOString(),
-              // Mock updated stats
-              followers: account.followers + Math.floor(Math.random() * 100),
+              followers: (account.followers || 0) + Math.floor(Math.random() * 100),
               analytics: {
                 ...account.analytics,
-                impressions: account.analytics.impressions + Math.floor(Math.random() * 1000),
-                engagement: account.analytics.engagement + Math.floor(Math.random() * 50),
+                impressions: (account.analytics?.impressions || 0) + Math.floor(Math.random() * 1000),
+                engagement: (account.analytics?.engagement || 0) + Math.floor(Math.random() * 50),
               },
             }
           : account,
       )
-
       setArtist({ ...artist, socialAccounts: updatedSocialAccounts })
       setIsConnectSocialOpen(false)
       setSocialFormData({ username: "", accessToken: "" })
@@ -111,36 +104,34 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
 
   const handleRefreshSocials = async () => {
     setIsRefreshing(true)
-
-    // Simulate API refresh
     setTimeout(() => {
-      const updatedSocialAccounts = artist.socialAccounts.map((account) =>
+      const updatedSocialAccounts = (artist.socialAccounts || []).map((account: any) =>
         account.isConnected
           ? {
               ...account,
               lastSync: new Date().toISOString(),
-              followers: account.followers + Math.floor(Math.random() * 20 - 10),
+              followers: (account.followers || 0) + Math.floor(Math.random() * 20 - 10),
               analytics: {
                 ...account.analytics,
-                impressions: account.analytics.impressions + Math.floor(Math.random() * 500),
-                engagement: account.analytics.engagement + Math.floor(Math.random() * 25),
-                engagementRate: Math.max(0, account.analytics.engagementRate + (Math.random() * 2 - 1)),
+                impressions: (account.analytics?.impressions || 0) + Math.floor(Math.random() * 500),
+                engagement: (account.analytics?.engagement || 0) + Math.floor(Math.random() * 25),
+                engagementRate: Math.max(0, (account.analytics?.engagementRate || 0) + (Math.random() * 2 - 1)),
               },
             }
           : account,
       )
-
       setArtist({ ...artist, socialAccounts: updatedSocialAccounts })
       setIsRefreshing(false)
     }, 1500)
   }
 
-  const connectedAccounts = (artist.socialAccounts || []).filter((acc) => acc.isConnected)
-  const totalFollowers = connectedAccounts.reduce((sum, acc) => sum + acc.followers, 0)
-  const totalEngagement = connectedAccounts.reduce((sum, acc) => sum + acc.analytics.engagement, 0)
+  const connectedAccounts = (artist.socialAccounts || []).filter((acc: any) => acc.isConnected)
+  const totalFollowers = connectedAccounts.reduce((sum: number, acc: any) => sum + (acc.followers || 0), 0)
+  const totalEngagement = connectedAccounts.reduce((sum: number, acc: any) => sum + (acc.analytics?.engagement || 0), 0)
   const avgEngagementRate =
     connectedAccounts.length > 0
-      ? connectedAccounts.reduce((sum, acc) => sum + acc.analytics.engagementRate, 0) / connectedAccounts.length
+      ? connectedAccounts.reduce((sum: number, acc: any) => sum + (acc.analytics?.engagementRate || 0), 0) /
+        connectedAccounts.length
       : 0
 
   return (
@@ -174,26 +165,28 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
               <Avatar className="h-32 w-32 border-4 border-white shadow-lg">
                 <AvatarImage src={artist.profileImage || "/placeholder.svg"} />
                 <AvatarFallback className="text-2xl">
-                  {artist.name
+                  {(artist.name || "A")
                     .split(" ")
-                    .map((n) => n[0])
+                    .map((n: string) => n[0])
                     .join("")}
                 </AvatarFallback>
               </Avatar>
               <div className="mt-4 text-center md:text-left">
-                <h1 className="text-3xl font-bold">{artist.name}</h1>
+                <h1 className="text-3xl font-bold">{artist.name || "New Artist"}</h1>
                 <p className="text-lg text-muted-foreground">{(artist.specialty || []).join(" • ")}</p>
                 <div className="flex items-center gap-2 mt-2">
                   <div className="flex">
                     {[...Array(5)].map((_, i) => (
                       <Star
                         key={i}
-                        className={`w-4 h-4 ${i < Math.floor(artist.rating) ? "text-yellow-400 fill-current" : "text-gray-300"}`}
+                        className={`w-4 h-4 ${
+                          i < Math.floor(artist.rating || 0) ? "text-yellow-400 fill-current" : "text-gray-300"
+                        }`}
                       />
                     ))}
                   </div>
                   <span className="text-sm text-muted-foreground">
-                    {artist.rating} ({artist.totalReviews} reviews)
+                    {(artist.rating || 0).toFixed(1)} ({artist.totalReviews || 0} reviews)
                   </span>
                 </div>
               </div>
@@ -201,7 +194,7 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
 
             <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-4 mt-8 md:mt-16">
               <div className="text-center">
-                <div className="text-2xl font-bold">{artist.totalAppointments}</div>
+                <div className="text-2xl font-bold">{artist.totalAppointments || 0}</div>
                 <div className="text-sm text-muted-foreground">Appointments</div>
               </div>
               <div className="text-center">
@@ -209,11 +202,11 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
                 <div className="text-sm text-muted-foreground">Followers</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold">{artist.portfolio.length}</div>
+                <div className="text-2xl font-bold">{(artist.portfolio || []).length}</div>
                 <div className="text-sm text-muted-foreground">Portfolio</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold">{artist.experience}</div>
+                <div className="text-2xl font-bold">{artist.experience || "N/A"}</div>
                 <div className="text-sm text-muted-foreground">Experience</div>
               </div>
             </div>
@@ -241,7 +234,7 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
                     <CardTitle>About</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-muted-foreground leading-relaxed">{artist.bio}</p>
+                    <p className="text-muted-foreground leading-relaxed">{artist.bio || "No bio available."}</p>
                   </CardContent>
                 </Card>
 
@@ -251,7 +244,7 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
                   </CardHeader>
                   <CardContent>
                     <div className="flex flex-wrap gap-2">
-                      {artist.specialty.map((spec, index) => (
+                      {(artist.specialty || []).map((spec: string, index: number) => (
                         <Badge key={index} variant="secondary" className="px-3 py-1">
                           {spec}
                         </Badge>
@@ -266,7 +259,7 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-3 gap-4">
-                      {artist.portfolio.slice(0, 6).map((item) => (
+                      {(artist.portfolio || []).slice(0, 6).map((item: any) => (
                         <div key={item.id} className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
                           <img
                             src={item.imageUrl || "/placeholder.svg"}
@@ -289,19 +282,19 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
                   <CardContent className="space-y-4">
                     <div className="flex items-center gap-3">
                       <Mail className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm">{artist.email}</span>
+                      <span className="text-sm">{artist.email || "N/A"}</span>
                     </div>
                     <div className="flex items-center gap-3">
                       <Phone className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm">{artist.phone}</span>
+                      <span className="text-sm">{artist.phone || "N/A"}</span>
                     </div>
                     <div className="flex items-center gap-3">
                       <MapPin className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm">{artist.location}</span>
+                      <span className="text-sm">{artist.location || "N/A"}</span>
                     </div>
                     <div className="flex items-center gap-3">
                       <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm">Next: {artist.nextAppointment}</span>
+                      <span className="text-sm">Next: {artist.nextAppointment || "N/A"}</span>
                     </div>
                   </CardContent>
                 </Card>
@@ -313,11 +306,11 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
                   <CardContent className="space-y-3">
                     <div className="flex justify-between">
                       <span className="text-sm text-muted-foreground">Experience:</span>
-                      <span className="text-sm font-medium">{artist.experience}</span>
+                      <span className="text-sm font-medium">{artist.experience || "N/A"}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-sm text-muted-foreground">Hourly Rate:</span>
-                      <span className="text-sm font-medium">${artist.hourlyRate}</span>
+                      <span className="text-sm font-medium">${artist.hourlyRate || 0}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-sm text-muted-foreground">Started:</span>
@@ -325,7 +318,9 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
                     </div>
                     <div className="flex justify-between">
                       <span className="text-sm text-muted-foreground">Status:</span>
-                      <Badge variant={artist.status === "active" ? "default" : "secondary"}>{artist.status}</Badge>
+                      <Badge variant={(artist.status || 'active') === "active" ? "default" : "secondary"}>
+                        {artist.status || "active"}
+                      </Badge>
                     </div>
                   </CardContent>
                 </Card>
@@ -336,7 +331,7 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2">
-                      {artist.certifications.map((cert, index) => (
+                      {(artist.certifications || []).map((cert: string, index: number) => (
                         <div key={index} className="flex items-center gap-2">
                           <Award className="h-4 w-4 text-green-600" />
                           <span className="text-sm">{cert}</span>
@@ -382,7 +377,7 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {(artist.portfolio || []).map((item) => (
+              {(artist.portfolio || []).map((item: any) => (
                 <Card key={item.id} className="overflow-hidden group">
                   <div className="aspect-square bg-gray-100 relative overflow-hidden">
                     <img
@@ -421,7 +416,7 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-1 mt-3">
-                      {item.tags.slice(0, 3).map((tag, index) => (
+                      {(item.tags || []).slice(0, 3).map((tag: string, index: number) => (
                         <Badge key={index} variant="outline" className="text-xs">
                           #{tag}
                         </Badge>
@@ -493,7 +488,7 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
 
             {/* Individual Platform Cards */}
             <div className="grid gap-6">
-              {artist.socialAccounts.map((account) => {
+              {(artist.socialAccounts || []).map((account: any) => {
                 const platform = socialPlatforms[account.platform as keyof typeof socialPlatforms]
                 const IconComponent = platform.icon
 
@@ -535,27 +530,31 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
                           {/* Stats */}
                           <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
                             <div className="text-center">
-                              <div className="text-lg font-bold">{formatNumber(account.followers)}</div>
+                              <div className="text-lg font-bold">{formatNumber(account.followers || 0)}</div>
                               <div className="text-xs text-muted-foreground">Followers</div>
                             </div>
                             <div className="text-center">
-                              <div className="text-lg font-bold">{formatNumber(account.following)}</div>
+                              <div className="text-lg font-bold">{formatNumber(account.following || 0)}</div>
                               <div className="text-xs text-muted-foreground">Following</div>
                             </div>
                             <div className="text-center">
-                              <div className="text-lg font-bold">{account.posts}</div>
+                              <div className="text-lg font-bold">{account.posts || 0}</div>
                               <div className="text-xs text-muted-foreground">Posts</div>
                             </div>
                             <div className="text-center">
-                              <div className="text-lg font-bold">{formatNumber(account.analytics.reach)}</div>
+                              <div className="text-lg font-bold">{formatNumber(account.analytics?.reach || 0)}</div>
                               <div className="text-xs text-muted-foreground">Reach</div>
                             </div>
                             <div className="text-center">
-                              <div className="text-lg font-bold">{formatNumber(account.analytics.engagement)}</div>
+                              <div className="text-lg font-bold">
+                                {formatNumber(account.analytics?.engagement || 0)}
+                              </div>
                               <div className="text-xs text-muted-foreground">Engagement</div>
                             </div>
                             <div className="text-center">
-                              <div className="text-lg font-bold">{account.analytics.engagementRate.toFixed(1)}%</div>
+                              <div className="text-lg font-bold">
+                                {(account.analytics?.engagementRate || 0).toFixed(1)}%
+                              </div>
                               <div className="text-xs text-muted-foreground">Rate</div>
                             </div>
                           </div>
@@ -563,11 +562,11 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
                           <Separator />
 
                           {/* Recent Posts */}
-                          {account.recentPosts.length > 0 && (
+                          {(account.recentPosts || []).length > 0 && (
                             <div>
                               <h4 className="font-medium mb-3">Recent Posts</h4>
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {account.recentPosts.map((post) => (
+                                {(account.recentPosts || []).map((post: any) => (
                                   <div key={post.id} className="flex gap-3 p-3 border rounded-lg">
                                     <img
                                       src={post.imageUrl || "/placeholder.svg"}
@@ -622,147 +621,12 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
             </div>
           </TabsContent>
 
-          <TabsContent value="analytics" className="space-y-6">
-            <div>
-              <h2 className="text-2xl font-bold">Analytics Dashboard</h2>
-              <p className="text-muted-foreground">Comprehensive performance metrics and insights</p>
-            </div>
-
-            {/* Key Metrics */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-2">
-                    <Eye className="h-4 w-4 text-blue-600" />
-                    <span className="text-sm font-medium">Total Impressions</span>
-                  </div>
-                  <p className="text-2xl font-bold mt-2">
-                    {formatNumber(connectedAccounts.reduce((sum, acc) => sum + acc.analytics.impressions, 0))}
-                  </p>
-                  <p className="text-xs text-green-600 mt-1">+12.5% this month</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4 text-purple-600" />
-                    <span className="text-sm font-medium">Total Reach</span>
-                  </div>
-                  <p className="text-2xl font-bold mt-2">
-                    {formatNumber(connectedAccounts.reduce((sum, acc) => sum + acc.analytics.reach, 0))}
-                  </p>
-                  <p className="text-xs text-green-600 mt-1">+8.3% this month</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-2">
-                    <Zap className="h-4 w-4 text-yellow-600" />
-                    <span className="text-sm font-medium">Engagement Rate</span>
-                  </div>
-                  <p className="text-2xl font-bold mt-2">{avgEngagementRate.toFixed(1)}%</p>
-                  <p className="text-xs text-green-600 mt-1">+2.1% this month</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4 text-green-600" />
-                    <span className="text-sm font-medium">Growth Rate</span>
-                  </div>
-                  <p className="text-2xl font-bold mt-2">
-                    {(
-                      connectedAccounts.reduce((sum, acc) => sum + acc.analytics.audienceGrowth, 0) /
-                        connectedAccounts.length || 0
-                    ).toFixed(1)}
-                    %
-                  </p>
-                  <p className="text-xs text-green-600 mt-1">Monthly average</p>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Platform Breakdown */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Platform Performance</CardTitle>
-                <CardDescription>Detailed analytics for each connected platform</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  {connectedAccounts.map((account) => {
-                    const platform = socialPlatforms[account.platform as keyof typeof socialPlatforms]
-                    const IconComponent = platform.icon
-
-                    return (
-                      <div key={account.platform} className="border rounded-lg p-4">
-                        <div className="flex items-center gap-3 mb-4">
-                          <IconComponent className={`h-6 w-6 ${platform.color}`} />
-                          <div>
-                            <h4 className="font-medium">{platform.name}</h4>
-                            <p className="text-sm text-muted-foreground">@{account.username}</p>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                          <div>
-                            <div className="text-lg font-bold">{formatNumber(account.analytics.impressions)}</div>
-                            <div className="text-xs text-muted-foreground">Impressions</div>
-                          </div>
-                          <div>
-                            <div className="text-lg font-bold">{formatNumber(account.analytics.reach)}</div>
-                            <div className="text-xs text-muted-foreground">Reach</div>
-                          </div>
-                          <div>
-                            <div className="text-lg font-bold">{formatNumber(account.analytics.engagement)}</div>
-                            <div className="text-xs text-muted-foreground">Engagement</div>
-                          </div>
-                          <div>
-                            <div className="text-lg font-bold">{account.analytics.engagementRate.toFixed(1)}%</div>
-                            <div className="text-xs text-muted-foreground">Engagement Rate</div>
-                          </div>
-                          <div>
-                            <div className="text-lg font-bold text-green-600">
-                              +{account.analytics.audienceGrowth.toFixed(1)}%
-                            </div>
-                            <div className="text-xs text-muted-foreground">Growth</div>
-                          </div>
-                        </div>
-
-                        {account.analytics.topHashtags.length > 0 && (
-                          <div className="mt-4">
-                            <h5 className="text-sm font-medium mb-2">Top Hashtags</h5>
-                            <div className="flex flex-wrap gap-2">
-                              {account.analytics.topHashtags.map((hashtag, index) => (
-                                <Badge key={index} variant="outline" className="text-xs">
-                                  {hashtag}
-                                </Badge>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {account.analytics.bestPostTime && (
-                          <div className="mt-3">
-                            <span className="text-sm text-muted-foreground">
-                              Best posting time: {account.analytics.bestPostTime}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
           <TabsContent value="reviews" className="space-y-6">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-2xl font-bold">Client Reviews</h2>
                 <p className="text-muted-foreground">
-                  {artist.totalReviews} reviews • {artist.rating} average rating
+                  {artist.totalReviews || 0} reviews • {artist.rating || 0} average rating
                 </p>
               </div>
               <div className="flex items-center gap-4">
@@ -771,17 +635,19 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
                     {[...Array(5)].map((_, i) => (
                       <Star
                         key={i}
-                        className={`w-5 h-5 ${i < Math.floor(artist.rating) ? "text-yellow-400 fill-current" : "text-gray-300"}`}
+                        className={`w-5 h-5 ${
+                          i < Math.floor(artist.rating || 0) ? "text-yellow-400 fill-current" : "text-gray-300"
+                        }`}
                       />
                     ))}
                   </div>
-                  <span className="text-lg font-semibold">{artist.rating}</span>
+                  <span className="text-lg font-semibold">{artist.rating || 0}</span>
                 </div>
               </div>
             </div>
 
             <div className="grid gap-4">
-              {artist.recentReviews.map((review) => (
+              {(artist.recentReviews || []).map((review: any) => (
                 <Card key={review.id}>
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between mb-3">
@@ -796,7 +662,9 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
                               {[...Array(5)].map((_, i) => (
                                 <Star
                                   key={i}
-                                  className={`w-4 h-4 ${i < review.rating ? "text-yellow-400 fill-current" : "text-gray-300"}`}
+                                  className={`w-4 h-4 ${
+                                    i < review.rating ? "text-yellow-400 fill-current" : "text-gray-300"
+                                  }`}
                                 />
                               ))}
                             </div>
