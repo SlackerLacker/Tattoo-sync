@@ -30,6 +30,7 @@ import {
   Activity,
   Award,
   MoreHorizontal,
+  Trash2,
   Clock,
   DollarSign,
   Zap,
