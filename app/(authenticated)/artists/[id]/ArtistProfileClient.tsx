@@ -54,6 +54,9 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
   const [selectedPlatform, setSelectedPlatform] = useState("")
   const [socialFormData, setSocialFormData] = useState({ username: "", accessToken: "" })
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [formData, setFormData] = useState<Partial<any>>({})
+  const [formError, setFormError] = useState<string | null>(null)
 
   if (!artist) {
     return <div>Artist not found</div>
@@ -134,6 +137,39 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
         connectedAccounts.length
       : 0
 
+  const resetForm = () => {
+    setFormData({})
+    setFormError(null)
+  }
+
+  const openEditDialog = () => {
+    setFormData(artist)
+    setFormError(null)
+    setIsEditDialogOpen(true)
+  }
+
+  const handleEditArtist = async () => {
+    setFormError(null)
+    if (formData.name && formData.email) {
+      const response = await fetch(`/api/artists/${artist.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      })
+      if (response.ok) {
+        const updatedArtist = await response.json()
+        setArtist(updatedArtist[0])
+        setIsEditDialogOpen(false)
+        resetForm()
+      } else {
+        const errorMessage = await response.text()
+        setFormError(errorMessage)
+      }
+    } else {
+      setFormError("Full Name and Email are required.")
+    }
+  }
+
   return (
     <div className="flex flex-1 flex-col gap-6">
       {/* Header */}
@@ -143,7 +179,7 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
           Back to Artists
         </Button>
         <div className="flex-1" />
-        <Button variant="outline" size="sm">
+        <Button variant="outline" size="sm" onClick={openEditDialog}>
           <Edit className="h-4 w-4 mr-2" />
           Edit Profile
         </Button>
@@ -750,6 +786,105 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
                 "Connect Account"
               )}
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog
+        open={isEditDialogOpen}
+        onOpenChange={(open) => {
+          setIsEditDialogOpen(open)
+          if (!open) {
+            resetForm()
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Edit Artist</DialogTitle>
+            <DialogDescription>Update artist information.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-name">Full Name *</Label>
+                <Input
+                  id="edit-name"
+                  placeholder="Enter full name"
+                  value={formData.name || ""}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-email">Email *</Label>
+                <Input
+                  id="edit-email"
+                  type="email"
+                  placeholder="artist@example.com"
+                  value={formData.email || ""}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-phone">Phone</Label>
+                <Input
+                  id="edit-phone"
+                  type="tel"
+                  placeholder="(555) 123-4567"
+                  value={formData.phone || ""}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-hourlyRate">Hourly Rate ($)</Label>
+                <Input
+                  id="edit-hourlyRate"
+                  type="number"
+                  placeholder="100"
+                  value={formData.hourlyRate || ""}
+                  onChange={(e) => setFormData({ ...formData, hourlyRate: Number.parseInt(e.target.value) || 0 })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-experience">Years of Experience</Label>
+                <Input
+                  id="edit-experience"
+                  placeholder="5 years"
+                  value={formData.experience || ""}
+                  onChange={(e) => setFormData({ ...formData, experience: e.target.value })}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-location">Location</Label>
+                <Input
+                  id="edit-location"
+                  placeholder="City, State"
+                  value={formData.location || ""}
+                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-bio">Bio</Label>
+              <Textarea
+                id="edit-bio"
+                placeholder="Tell us about the artist..."
+                value={formData.bio || ""}
+                onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
+              />
+            </div>
+          </div>
+          {formError && <p className="text-sm text-red-500">{formError}</p>}
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleEditArtist}>Save Changes</Button>
           </div>
         </DialogContent>
       </Dialog>
