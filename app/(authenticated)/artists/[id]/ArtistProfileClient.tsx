@@ -182,7 +182,7 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
               </Avatar>
               <div className="mt-4 text-center md:text-left">
                 <h1 className="text-3xl font-bold">{artist.name}</h1>
-                <p className="text-lg text-muted-foreground">{artist.specialty.join(" • ")}</p>
+                <p className="text-lg text-muted-foreground">{(artist.specialty || []).join(" • ")}</p>
                 <div className="flex items-center gap-2 mt-2">
                   <div className="flex">
                     {[...Array(5)].map((_, i) => (
