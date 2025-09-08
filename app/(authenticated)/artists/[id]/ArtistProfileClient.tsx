@@ -135,7 +135,7 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
     }, 1500)
   }
 
-  const connectedAccounts = artist.socialAccounts.filter((acc) => acc.isConnected)
+  const connectedAccounts = (artist.socialAccounts || []).filter((acc) => acc.isConnected)
   const totalFollowers = connectedAccounts.reduce((sum, acc) => sum + acc.followers, 0)
   const totalEngagement = connectedAccounts.reduce((sum, acc) => sum + acc.analytics.engagement, 0)
   const avgEngagementRate =
