@@ -29,6 +29,7 @@ import {
   ExternalLink,
   Activity,
   Award,
+  MoreHorizontal,
   Clock,
   DollarSign,
   Zap,
