@@ -152,10 +152,11 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
   const handleEditArtist = async () => {
     setFormError(null)
     if (formData.name && formData.email) {
+      const { socialAccounts, ...restOfFormData } = formData
       const response = await fetch(`/api/artists/${artist.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(restOfFormData),
       })
       if (response.ok) {
         const updatedArtist = await response.json()
