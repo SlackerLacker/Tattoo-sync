@@ -58,6 +58,8 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [formData, setFormData] = useState<Partial<any>>({})
   const [formError, setFormError] = useState<string | null>(null)
+  const [isAddPieceDialogOpen, setIsAddPieceDialogOpen] = useState(false)
+  const [newPieceFormData, setNewPieceFormData] = useState<Partial<any>>({})
 
   if (!artist) {
     return <div>Artist not found</div>
@@ -169,6 +171,31 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
       }
     } else {
       setFormError("Full Name and Email are required.")
+    }
+  }
+
+  const handleAddPiece = async () => {
+    setFormError(null)
+    if (!newPieceFormData.title) {
+      setFormError("Title is required.")
+      return
+    }
+
+    const response = await fetch(`/api/artists/${artist.id}/portfolio`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(newPieceFormData),
+    })
+
+    if (response.ok) {
+      const newPiece = await response.json()
+      const updatedPortfolio = [...(artist.portfolio || []), newPiece[0]]
+      setArtist({ ...artist, portfolio: updatedPortfolio })
+      setIsAddPieceDialogOpen(false)
+      setNewPieceFormData({})
+    } else {
+      const errorMessage = await response.text()
+      setFormError(errorMessage)
     }
   }
 
@@ -408,7 +435,7 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
                 <h2 className="text-2xl font-bold">Portfolio</h2>
                 <p className="text-muted-foreground">{(artist.portfolio || []).length} pieces showcasing artistic range</p>
               </div>
-              <Button>
+              <Button onClick={() => setIsAddPieceDialogOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add Piece
               </Button>
@@ -887,6 +914,92 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
               Cancel
             </Button>
             <Button onClick={handleEditArtist}>Save Changes</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Piece Dialog */}
+      <Dialog
+        open={isAddPieceDialogOpen}
+        onOpenChange={(open) => {
+          setIsAddPieceDialogOpen(open)
+          if (!open) {
+            setNewPieceFormData({})
+            setFormError(null)
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Add New Portfolio Piece</DialogTitle>
+            <DialogDescription>Showcase a new piece of work.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="piece-title">Title *</Label>
+              <Input
+                id="piece-title"
+                placeholder="e.g., Traditional Eagle Chest Piece"
+                value={newPieceFormData.title || ""}
+                onChange={(e) => setNewPieceFormData({ ...newPieceFormData, title: e.target.value })}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="piece-description">Description</Label>
+              <Textarea
+                id="piece-description"
+                placeholder="A short description of the piece..."
+                value={newPieceFormData.description || ""}
+                onChange={(e) => setNewPieceFormData({ ...newPieceFormData, description: e.target.value })}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="piece-image_url">Image URL</Label>
+              <Input
+                id="piece-image_url"
+                placeholder="https://example.com/image.jpg"
+                value={newPieceFormData.image_url || ""}
+                onChange={(e) => setNewPieceFormData({ ...newPieceFormData, image_url: e.target.value })}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="piece-category">Category</Label>
+                <Input
+                  id="piece-category"
+                  placeholder="e.g., Traditional"
+                  value={newPieceFormData.category || ""}
+                  onChange={(e) => setNewPieceFormData({ ...newPieceFormData, category: e.target.value })}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="piece-date">Date</Label>
+                <Input
+                  id="piece-date"
+                  type="date"
+                  value={newPieceFormData.piece_date || ""}
+                  onChange={(e) => setNewPieceFormData({ ...newPieceFormData, piece_date: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="piece-tags">Tags (comma-separated)</Label>
+              <Input
+                id="piece-tags"
+                placeholder="e.g., eagle, traditional, chest"
+                value={(newPieceFormData.tags || []).join(", ")}
+                onChange={(e) =>
+                  setNewPieceFormData({ ...newPieceFormData, tags: e.target.value.split(",").map((t) => t.trim()) })
+                }
+              />
+            </div>
+          </div>
+          {formError && <p className="text-sm text-red-500">{formError}</p>}
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setIsAddPieceDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleAddPiece}>Add Piece</Button>
           </div>
         </DialogContent>
       </Dialog>
