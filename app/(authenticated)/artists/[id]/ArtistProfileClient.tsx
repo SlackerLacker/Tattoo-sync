@@ -356,7 +356,7 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
                       {(artist.portfolio || []).slice(0, 6).map((item: any) => (
                         <div key={item.id} className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
                           <img
-                            src={item.imageUrl || "/placeholder.svg"}
+                            src={item.image_url || "/placeholder.svg"}
                             alt={item.title}
                             className="w-full h-full object-cover hover:scale-105 transition-transform cursor-pointer"
                           />
