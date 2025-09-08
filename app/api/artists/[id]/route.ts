@@ -9,7 +9,7 @@ export async function GET(request: Request) {
 
   const { data: artist, error } = await supabase
     .from("artists")
-    .select("*, portfolio_pieces(*)")
+    .select("*, portfolio_pieces:portfolio_pieces(*)")
     .eq("id", id)
     .single()
 
