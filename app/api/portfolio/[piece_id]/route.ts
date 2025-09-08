@@ -1,0 +1,27 @@
+import { createServerSupabase } from "@/lib/supabase/server-client"
+import { cookies } from "next/headers"
+import { NextResponse } from "next/server"
+
+export async function DELETE(request: Request) {
+  const cookieStore = await cookies()
+  const supabase = createServerSupabase(cookieStore)
+  const pieceId = request.url.split("/").pop()
+
+  if (!pieceId) {
+    return new NextResponse("Missing piece ID", { status: 400 })
+  }
+
+  try {
+    const { error } = await supabase.from("portfolio_pieces").delete().eq("id", pieceId)
+
+    if (error) {
+      console.error("Error deleting portfolio piece:", error)
+      return new NextResponse(error.message, { status: 400 })
+    }
+
+    return new NextResponse(null, { status: 204 }) // 204 No Content is standard for successful DELETE
+  } catch (err) {
+    console.error("Error processing request:", err)
+    return new NextResponse("Internal Server Error", { status: 500 })
+  }
+}

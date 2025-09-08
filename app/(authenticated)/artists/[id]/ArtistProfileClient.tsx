@@ -62,6 +62,8 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
   const [formError, setFormError] = useState<string | null>(null)
   const [isAddPieceDialogOpen, setIsAddPieceDialogOpen] = useState(false)
   const [newPieceFormData, setNewPieceFormData] = useState<Partial<any>>({})
+  const [isDeletePieceDialogOpen, setIsDeletePieceDialogOpen] = useState(false)
+  const [selectedPiece, setSelectedPiece] = useState<any | null>(null)
 
   if (!artist) {
     return <div>Artist not found</div>
@@ -225,6 +227,29 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
       setFormError(error.message)
     } finally {
       setIsUploading(false)
+    }
+  }
+
+  const openDeleteDialog = (piece: any) => {
+    setSelectedPiece(piece)
+    setIsDeletePieceDialogOpen(true)
+  }
+
+  const handleDeletePiece = async () => {
+    if (!selectedPiece) return
+
+    const response = await fetch(`/api/portfolio/${selectedPiece.id}`, {
+      method: "DELETE",
+    })
+
+    if (response.ok) {
+      const updatedPortfolio = (artist.portfolio || []).filter((p: any) => p.id !== selectedPiece.id)
+      setArtist({ ...artist, portfolio: updatedPortfolio })
+      setIsDeletePieceDialogOpen(false)
+      setSelectedPiece(null)
+    } else {
+      // Handle error, maybe show a toast notification
+      console.error("Failed to delete portfolio piece")
     }
   }
 
@@ -479,10 +504,27 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
                       alt={item.title}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
-                    <div className="absolute top-2 right-2">
+                    <div className="absolute top-2 right-2 flex items-center gap-2">
                       <Badge variant={item.isPublic ? "default" : "secondary"}>
                         {item.isPublic ? "Public" : "Private"}
                       </Badge>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0 bg-white/80 hover:bg-white">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem>
+                            <Edit className="mr-2 h-4 w-4" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => openDeleteDialog(item)} className="text-red-600">
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                     <div className="absolute bottom-2 left-2">
                       <Badge variant="outline" className="bg-white/90">
@@ -1050,6 +1092,24 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Piece Confirmation Dialog */}
+      <AlertDialog open={isDeletePieceDialogOpen} onOpenChange={setIsDeletePieceDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Portfolio Piece</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the piece "{selectedPiece?.title}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeletePiece} className="bg-red-600 hover:bg-red-700">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
