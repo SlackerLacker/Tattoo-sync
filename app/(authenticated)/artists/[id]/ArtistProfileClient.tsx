@@ -38,6 +38,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 
 const socialPlatforms = {
   instagram: { name: "Instagram", icon: Instagram, color: "text-pink-600", bgColor: "bg-pink-50" },
