@@ -23,6 +23,7 @@ export async function GET(request: Request) {
     .from("portfolio_pieces")
     .select("*")
     .eq("artist_id", id)
+    .order("position", { ascending: true })
 
   if (piecesError) {
     // Log the error but don't fail the whole request
