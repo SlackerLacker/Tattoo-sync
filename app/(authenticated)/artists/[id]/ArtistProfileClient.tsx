@@ -3,6 +3,15 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase/browser-client"
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from "@dnd-kit/core"
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -59,6 +68,59 @@ const socialPlatforms = {
   facebook: { name: "Facebook", icon: Facebook, color: "text-blue-600", bgColor: "bg-blue-50" },
   twitter: { name: "Twitter", icon: Twitter, color: "text-blue-400", bgColor: "bg-blue-50" },
   tiktok: { name: "TikTok", icon: Activity, color: "text-black", bgColor: "bg-gray-50" },
+}
+
+function SortablePiece({ item, openEditPieceDialog, openDeleteDialog }: { item: any, openEditPieceDialog: any, openDeleteDialog: any }) {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: item.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  }
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+      <Card className="relative overflow-hidden hover:shadow-lg transition-shadow">
+        <CardContent className="p-4">
+          <div className="aspect-square bg-gray-100 relative overflow-hidden mb-2">
+            <img
+              src={item.image_url || "/placeholder.svg"}
+              alt={item.title}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            />
+            <div className="absolute top-2 right-2 flex items-center gap-2">
+              <Badge variant={item.is_public ? "default" : "secondary"}>
+                {item.is_public ? "Public" : "Private"}
+              </Badge>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0 bg-white/80 hover:bg-white">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => openEditPieceDialog(item)}>
+                    <Edit className="mr-2 h-4 w-4" />
+                    Edit
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    <Eye className="mr-2 h-4 w-4" />
+                    Make Private
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => openDeleteDialog(item)} className="text-red-600">
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+          <h3 className="font-semibold truncate">{item.title}</h3>
+          <p className="text-xs text-muted-foreground">{item.category || "Uncategorized"}</p>
+        </CardContent>
+      </Card>
+    </div>
+  )
 }
 
 export default function ArtistProfileClient({ artist: initialArtist }: { artist: any }) {
@@ -158,6 +220,34 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
       ? connectedAccounts.reduce((sum: number, acc: any) => sum + (acc.analytics?.engagementRate || 0), 0) /
         connectedAccounts.length
       : 0
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  )
+
+  const handleDragEnd = (event: any) => {
+    const { active, over } = event
+    if (active.id !== over.id) {
+      setArtist((artist) => {
+        const oldIndex = (artist.portfolio || []).findIndex((p: any) => p.id === active.id)
+        const newIndex = (artist.portfolio || []).findIndex((p: any) => p.id === over.id)
+        const newPortfolio = arrayMove(artist.portfolio, oldIndex, newIndex)
+
+        // Call API to update backend
+        const orderedIds = newPortfolio.map((p: any) => p.id)
+        fetch(`/api/portfolio/reorder`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderedIds }),
+        })
+
+        return { ...artist, portfolio: newPortfolio }
+      })
+    }
+  }
 
   const resetForm = () => {
     setFormData({})
@@ -565,77 +655,20 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
               </Button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {(artist.portfolio || []).map((item: any) => (
-                <Card key={item.id} className="overflow-hidden group">
-                  <div className="aspect-square bg-gray-100 relative overflow-hidden">
-                    <img
-                      src={item.image_url || "/placeholder.svg"}
-                      alt={item.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={artist.portfolio || []} strategy={verticalListSortingStrategy}>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {(artist.portfolio || []).map((item: any) => (
+                    <SortablePiece
+                      key={item.id}
+                      item={item}
+                      openEditPieceDialog={openEditPieceDialog}
+                      openDeleteDialog={openDeleteDialog}
                     />
-                    <div className="absolute top-2 right-2 flex items-center gap-2">
-                      <Badge variant={item.is_public ? "default" : "secondary"}>
-                        {item.is_public ? "Public" : "Private"}
-                      </Badge>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0 bg-white/80 hover:bg-white">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => openEditPieceDialog(item)}>
-                            <Edit className="mr-2 h-4 w-4" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleToggleIsPublic(item)}>
-                            <Eye className="mr-2 h-4 w-4" />
-                            {item.is_public ? "Make Private" : "Make Public"}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => openDeleteDialog(item)} className="text-red-600">
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                    <div className="absolute bottom-2 left-2">
-                      <Badge variant="outline" className="bg-white/90">
-                        {item.category}
-                      </Badge>
-                    </div>
-                  </div>
-                  <CardContent className="p-4">
-                    <h3 className="font-semibold mb-2">{item.title}</h3>
-                    <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{item.description}</p>
-                    <div className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-1">
-                          <Heart className="h-4 w-4 text-red-500" />
-                          <span>{item.likes}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Clock className="h-4 w-4 text-muted-foreground" />
-                          <span>{item.duration}</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <DollarSign className="h-4 w-4 text-green-600" />
-                        <span>${item.price}</span>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap gap-1 mt-3">
-                      {(item.tags || []).slice(0, 3).map((tag: string, index: number) => (
-                        <Badge key={index} variant="outline" className="text-xs">
-                          #{tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
           </TabsContent>
 
           <TabsContent value="social" className="space-y-6">
