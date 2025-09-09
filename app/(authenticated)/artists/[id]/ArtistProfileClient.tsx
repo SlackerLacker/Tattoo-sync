@@ -77,6 +77,8 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
   const [newPieceFormData, setNewPieceFormData] = useState<Partial<any>>({})
   const [isDeletePieceDialogOpen, setIsDeletePieceDialogOpen] = useState(false)
   const [selectedPiece, setSelectedPiece] = useState<any | null>(null)
+  const [isEditPieceDialogOpen, setIsEditPieceDialogOpen] = useState(false)
+  const [editPieceFormData, setEditPieceFormData] = useState<Partial<any>>({})
 
   if (!artist) {
     return <div>Artist not found</div>
@@ -263,6 +265,43 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
     } else {
       // Handle error, maybe show a toast notification
       console.error("Failed to delete portfolio piece")
+    }
+  }
+
+  const openEditPieceDialog = (piece: any) => {
+    setSelectedPiece(piece)
+    setEditPieceFormData(piece)
+    setFormError(null)
+    setIsEditPieceDialogOpen(true)
+  }
+
+  const handleEditPiece = async () => {
+    if (!selectedPiece) return
+    setFormError(null)
+
+    if (!editPieceFormData.title) {
+      setFormError("Title is required.")
+      return
+    }
+
+    const response = await fetch(`/api/portfolio/${selectedPiece.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(editPieceFormData),
+    })
+
+    if (response.ok) {
+      const updatedPiece = await response.json()
+      const updatedPortfolio = (artist.portfolio || []).map((p: any) =>
+        p.id === selectedPiece.id ? updatedPiece[0] : p,
+      )
+      setArtist({ ...artist, portfolio: updatedPortfolio })
+      setIsEditPieceDialogOpen(false)
+      setEditPieceFormData({})
+      setSelectedPiece(null)
+    } else {
+      const errorMessage = await response.text()
+      setFormError(errorMessage)
     }
   }
 
@@ -528,7 +567,7 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => openEditPieceDialog(item)}>
                             <Edit className="mr-2 h-4 w-4" />
                             Edit
                           </DropdownMenuItem>
@@ -1123,6 +1162,84 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Edit Piece Dialog */}
+      <Dialog
+        open={isEditPieceDialogOpen}
+        onOpenChange={(open) => {
+          setIsEditPieceDialogOpen(open)
+          if (!open) {
+            setEditPieceFormData({})
+            setFormError(null)
+            setSelectedPiece(null)
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Edit Portfolio Piece</DialogTitle>
+            <DialogDescription>Update the details for this piece of work.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="edit-piece-title">Title *</Label>
+              <Input
+                id="edit-piece-title"
+                placeholder="e.g., Traditional Eagle Chest Piece"
+                value={editPieceFormData.title || ""}
+                onChange={(e) => setEditPieceFormData({ ...editPieceFormData, title: e.target.value })}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-piece-description">Description</Label>
+              <Textarea
+                id="edit-piece-description"
+                placeholder="A short description of the piece..."
+                value={editPieceFormData.description || ""}
+                onChange={(e) => setEditPieceFormData({ ...editPieceFormData, description: e.target.value })}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-piece-category">Category</Label>
+                <Input
+                  id="edit-piece-category"
+                  placeholder="e.g., Traditional"
+                  value={editPieceFormData.category || ""}
+                  onChange={(e) => setEditPieceFormData({ ...editPieceFormData, category: e.target.value })}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-piece-date">Date</Label>
+                <Input
+                  id="edit-piece-date"
+                  type="date"
+                  value={editPieceFormData.piece_date || ""}
+                  onChange={(e) => setEditPieceFormData({ ...editPieceFormData, piece_date: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-piece-tags">Tags (comma-separated)</Label>
+              <Input
+                id="edit-piece-tags"
+                placeholder="e.g., eagle, traditional, chest"
+                value={(editPieceFormData.tags || []).join(", ")}
+                onChange={(e) =>
+                  setEditPieceFormData({ ...editPieceFormData, tags: e.target.value.split(",").map((t) => t.trim()) })
+                }
+              />
+            </div>
+          </div>
+          {formError && <p className="text-sm text-red-500">{formError}</p>}
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setIsEditPieceDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleEditPiece}>Save Changes</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
