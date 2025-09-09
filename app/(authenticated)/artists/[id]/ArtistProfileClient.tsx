@@ -268,6 +268,24 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
     }
   }
 
+  const handleToggleIsPublic = async (piece: any) => {
+    const response = await fetch(`/api/portfolio/${piece.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ is_public: !piece.is_public }),
+    })
+
+    if (response.ok) {
+      const updatedPiece = await response.json()
+      const updatedPortfolio = (artist.portfolio || []).map((p: any) =>
+        p.id === piece.id ? updatedPiece[0] : p,
+      )
+      setArtist({ ...artist, portfolio: updatedPortfolio })
+    } else {
+      console.error("Failed to toggle is_public status")
+    }
+  }
+
   const openEditPieceDialog = (piece: any) => {
     setSelectedPiece(piece)
     setEditPieceFormData(piece)
@@ -557,8 +575,8 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                     <div className="absolute top-2 right-2 flex items-center gap-2">
-                      <Badge variant={item.isPublic ? "default" : "secondary"}>
-                        {item.isPublic ? "Public" : "Private"}
+                      <Badge variant={item.is_public ? "default" : "secondary"}>
+                        {item.is_public ? "Public" : "Private"}
                       </Badge>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -570,6 +588,10 @@ export default function ArtistProfileClient({ artist: initialArtist }: { artist:
                           <DropdownMenuItem onClick={() => openEditPieceDialog(item)}>
                             <Edit className="mr-2 h-4 w-4" />
                             Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleToggleIsPublic(item)}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            {item.is_public ? "Make Private" : "Make Public"}
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => openDeleteDialog(item)} className="text-red-600">
                             <Trash2 className="mr-2 h-4 w-4" />
