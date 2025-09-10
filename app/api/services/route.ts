@@ -20,6 +20,7 @@ export async function POST(request: Request) {
   const { data: service, error } = await supabase.from("services").insert([await request.json()])
 
   if (error) {
+    console.error(error)
     return new NextResponse(error.message, { status: 500 })
   }
 
