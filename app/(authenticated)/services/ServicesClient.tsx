@@ -139,10 +139,15 @@ export default function ServicesClient({ services: initialServices }: ServicesCl
 
   const handleAddService = async () => {
     if (serviceFormData.name && serviceFormData.category && serviceFormData.price) {
+      const { duration, ...rest } = serviceFormData
+      const payload = {
+        ...rest,
+        duration_minutes: duration ? duration * 60 : 0,
+      }
       const response = await fetch("/api/services", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(serviceFormData),
+        body: JSON.stringify(payload),
       })
       if (response.ok) {
         const newService = await response.json()
@@ -155,10 +160,15 @@ export default function ServicesClient({ services: initialServices }: ServicesCl
 
   const handleEditService = async () => {
     if (selectedService && serviceFormData.name && serviceFormData.category && serviceFormData.price) {
+      const { duration, ...rest } = serviceFormData
+      const payload = {
+        ...rest,
+        duration_minutes: duration ? duration * 60 : 0,
+      }
       const response = await fetch(`/api/services/${selectedService.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(serviceFormData),
+        body: JSON.stringify(payload),
       })
       if (response.ok) {
         const updatedService = await response.json()
