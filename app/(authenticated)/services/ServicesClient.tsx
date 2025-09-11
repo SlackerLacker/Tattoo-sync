@@ -197,7 +197,10 @@ export default function ServicesClient({ services: initialServices }: ServicesCl
 
   const openEditServiceDialog = (service: Service) => {
     setSelectedService(service)
-    setServiceFormData(service)
+    setServiceFormData({
+      ...service,
+      duration: (service.duration_minutes || 0) / 60,
+    })
     setIsEditServiceDialogOpen(true)
   }
 
@@ -305,7 +308,12 @@ export default function ServicesClient({ services: initialServices }: ServicesCl
                     <span className="text-sm font-medium">Avg. Duration</span>
                   </div>
                   <p className="text-2xl font-bold mt-2">
-                    {(services.reduce((sum, s) => sum + s.duration, 0) / services.length).toFixed(1)}h
+                    {(
+                      services.reduce((sum, s) => sum + (s.duration_minutes || 0), 0) /
+                      60 /
+                      (services.length || 1)
+                    ).toFixed(1)}
+                    h
                   </p>
                 </CardContent>
               </Card>
@@ -437,7 +445,7 @@ export default function ServicesClient({ services: initialServices }: ServicesCl
                       </div>
                       <div className="flex items-center gap-1">
                         <Clock className="h-3 w-3" />
-                        {service.duration}h
+                        {(service.duration_minutes || 0) / 60}h
                       </div>
                     </div>
                     <div className="text-sm text-muted-foreground">{service.popularity}% popular</div>
