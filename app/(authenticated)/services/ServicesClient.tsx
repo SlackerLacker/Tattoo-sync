@@ -290,15 +290,6 @@ export default function ServicesClient({ services: initialServices }: ServicesCl
               <Card>
                 <CardContent className="p-4">
                   <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-green-500 rounded-full" />
-                    <span className="text-sm font-medium">Active</span>
-                  </div>
-                  <p className="text-2xl font-bold mt-2">{services.filter((s) => s.isActive).length}</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-2">
                     <DollarSign className="h-4 w-4 text-green-600" />
                     <span className="text-sm font-medium">Avg. Price</span>
                   </div>
@@ -438,9 +429,6 @@ export default function ServicesClient({ services: initialServices }: ServicesCl
                 <CardContent className="space-y-4">
                   <div className="flex items-center gap-2">
                     <Badge className={getCategoryColor(service.category)}>{service.category}</Badge>
-                    <Badge variant={service.isActive ? "default" : "secondary"}>
-                      {service.isActive ? "Active" : "Inactive"}
-                    </Badge>
                   </div>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
@@ -729,21 +717,6 @@ export default function ServicesClient({ services: initialServices }: ServicesCl
                     setServiceFormData({ ...serviceFormData, duration: Number.parseFloat(e.target.value) })
                   }
                 />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="edit-service-status">Status</Label>
-                <Select
-                  value={serviceFormData.isActive ? "active" : "inactive"}
-                  onValueChange={(value) => setServiceFormData({ ...serviceFormData, isActive: value === "active" })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="inactive">Inactive</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
             </div>
           </div>
