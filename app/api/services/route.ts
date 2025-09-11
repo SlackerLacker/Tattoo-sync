@@ -17,7 +17,9 @@ export async function GET() {
 export async function POST(request: Request) {
   const cookieStore = await cookies()
   const supabase = createServerSupabase(cookieStore)
-  const { data: service, error } = await supabase.from("services").insert([await request.json()])
+  const serviceData = await request.json()
+  console.log("Received data on server:", serviceData)
+  const { data: service, error } = await supabase.from("services").insert([serviceData])
 
   if (error) {
     console.error(error)

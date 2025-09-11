@@ -144,6 +144,7 @@ export default function ServicesClient({ services: initialServices }: ServicesCl
         ...rest,
         duration_minutes: duration ? duration * 60 : 0,
       }
+      console.log("Sending payload to API:", payload)
       const response = await fetch("/api/services", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
