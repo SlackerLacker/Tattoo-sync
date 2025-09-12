@@ -150,8 +150,8 @@ export default function ScheduleClient({
     tip: 0,
     notes: "",
   })
-  const [isNewClient, setIsNewClient] = useState(true)
   const [formError, setFormError] = useState<string | null>(null)
+  const [showNewClientFields, setShowNewClientFields] = useState(false)
 
   // Drag selection state
   const [dragSelection, setDragSelection] = useState<DragSelection>({
@@ -434,7 +434,7 @@ export default function ScheduleClient({
     setFormData({})
     setSelectedAppointment(null)
     setFormError(null)
-    setIsNewClient(true)
+    setShowNewClientFields(false)
   }
 
   const resetCheckout = () => {
@@ -628,7 +628,7 @@ export default function ScheduleClient({
     let finalClientId = formData.client_id
 
     // Step 1: Create a new client if needed
-    if (isNewClient) {
+    if (showNewClientFields) {
       if (!formData.client_full_name || !formData.client_email) {
         setFormError("New client's Full Name and Email are required.")
         return
@@ -1704,15 +1704,39 @@ export default function ScheduleClient({
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="flex items-center space-x-2">
-              <Label htmlFor="client-mode">Select Existing Client</Label>
-              <Switch id="client-mode" checked={!isNewClient} onCheckedChange={(checked) => setIsNewClient(!checked)} />
-              <Label htmlFor="client-mode">Create New Client</Label>
+            <div>
+              <Label htmlFor="client_id">Client *</Label>
+              <Select
+                value={formData.client_id?.toString() || ""}
+                onValueChange={(value) => {
+                  if (value === "new-client") {
+                    setShowNewClientFields(true)
+                    setFormData({ ...formData, client_id: undefined })
+                  } else {
+                    setShowNewClientFields(false)
+                    setFormData({ ...formData, client_id: Number(value) })
+                  }
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select an existing client or create new" />
+                </SelectTrigger>
+                <SelectContent>
+                  {clients.map((client) => (
+                    <SelectItem key={client.id} value={client.id.toString()}>
+                      {client.full_name} ({client.email})
+                    </SelectItem>
+                  ))}
+                  <Separator />
+                  <SelectItem value="new-client">
+                    <span className="font-medium text-blue-600">Create New Client...</span>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <Separator />
 
-            {isNewClient ? (
-              <div className="space-y-4 p-4 border rounded-md">
+            {showNewClientFields && (
+              <div className="space-y-4 p-4 border rounded-md bg-gray-50">
                 <h4 className="font-medium">New Client Details</h4>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -1744,25 +1768,6 @@ export default function ScheduleClient({
                     placeholder="client@email.com"
                   />
                 </div>
-              </div>
-            ) : (
-              <div>
-                <Label htmlFor="client_id">Client *</Label>
-                <Select
-                  value={formData.client_id?.toString() || ""}
-                  onValueChange={(value) => setFormData({ ...formData, client_id: Number(value) })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select an existing client" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clients.map((client) => (
-                      <SelectItem key={client.id} value={client.id.toString()}>
-                        {client.full_name} ({client.email})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
               </div>
             )}
 
