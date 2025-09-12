@@ -38,18 +38,20 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Appointment, Artist, Service } from "@/types"
+import { Appointment, Artist, Service, Client } from "@/types"
 
 interface AppointmentsClientProps {
   appointments: Appointment[]
   artists: Artist[]
   services: Service[]
+  clients: Client[]
 }
 
 export default function AppointmentsClient({
   appointments: initialAppointments,
   artists,
   services,
+  clients,
 }: AppointmentsClientProps) {
   const [appointments, setAppointments] = useState<Appointment[]>(initialAppointments)
   const [searchTerm, setSearchTerm] = useState("")
@@ -62,16 +64,35 @@ export default function AppointmentsClient({
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [formData, setFormData] = useState<Partial<Appointment>>({})
 
-  const formatTime = (hour: number) => {
-    const h = Math.floor(hour)
-    const m = (hour % 1) * 60
-    const period = h >= 12 ? "PM" : "AM"
-    const displayHour = h > 12 ? h - 12 : h === 0 ? 12 : h
-    return `${displayHour}${m > 0 ? `:${m.toString().padStart(2, "0")}` : ""}${period}`
+  const formatTime = (timeString: string | null | undefined) => {
+    if (!timeString) return "N/A"
+    const [hours, minutes] = timeString.split(":").map(Number)
+    const date = new Date()
+    date.setHours(hours, minutes)
+    return date.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    })
   }
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
+  const getEndTime = (startTime: string | null | undefined, duration: number | null | undefined) => {
+    if (!startTime || !duration) return ""
+    const [hours, minutes] = startTime.split(":").map(Number)
+    const startDate = new Date()
+    startDate.setHours(hours, minutes, 0)
+    const endDate = new Date(startDate.getTime() + duration * 60000)
+    return endDate.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    })
+  }
+
+  const formatDate = (dateString: string | null | undefined) => {
+    if (!dateString) return "N/A"
+    // Add a time zone correction to avoid off-by-one day errors
+    const date = new Date(dateString + "T00:00:00")
     return date.toLocaleDateString("en-US", {
       weekday: "short",
       month: "short",
@@ -110,10 +131,6 @@ export default function AppointmentsClient({
     }
   }
 
-  const getArtistById = (id: number) => {
-    return artists.find((artist) => artist.id === id)
-  }
-
   const filterAppointments = () => {
     const today = new Date()
     const tomorrow = new Date(today)
@@ -121,18 +138,20 @@ export default function AppointmentsClient({
     const weekFromNow = new Date(today)
     weekFromNow.setDate(today.getDate() + 7)
 
-    return appointments
+    return (appointments || [])
       .filter((appointment) => {
         const matchesSearch =
-          appointment.client.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          appointment.service.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          appointment.phone.includes(searchTerm) ||
-          (appointment.email && appointment.email.toLowerCase().includes(searchTerm.toLowerCase()))
+          appointment.clients?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          appointment.services?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          appointment.artists?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          appointment.clients?.phone?.includes(searchTerm) ||
+          appointment.clients?.email?.toLowerCase().includes(searchTerm.toLowerCase())
 
         const matchesStatus = statusFilter === "all" || appointment.status === statusFilter
-        const matchesArtist = artistFilter === "all" || appointment.artistId.toString() === artistFilter
+        const matchesArtist = artistFilter === "all" || appointment.artist_id?.toString() === artistFilter
 
-        const appointmentDate = new Date(appointment.date)
+        if (!appointment.appointment_date) return false
+        const appointmentDate = new Date(appointment.appointment_date)
         let matchesDate = true
 
         if (dateFilter === "today") {
@@ -147,13 +166,14 @@ export default function AppointmentsClient({
           matchesDate = appointmentDate < today
         }
 
-        return matchesSearch && matchesStatus && matchesArtist && matchesDate
+        return !!(matchesSearch && matchesStatus && matchesArtist && matchesDate)
       })
       .sort((a, b) => {
         // Sort by date first, then by start time
-        const dateCompare = new Date(a.date).getTime() - new Date(b.date).getTime()
+        const dateCompare = new Date(a.appointment_date).getTime() - new Date(b.appointment_date).getTime()
         if (dateCompare !== 0) return dateCompare
-        return a.startTime - b.startTime
+        // Assuming start_time is a string like "HH:mm:ss"
+        return (a.start_time || "").localeCompare(b.start_time || "")
       })
   }
 
@@ -161,8 +181,10 @@ export default function AppointmentsClient({
 
   const getStats = () => {
     const today = new Date()
-    const upcoming = appointments.filter((apt) => new Date(apt.date) >= today && apt.status !== "cancelled")
-    const confirmed = appointments.filter((apt) => apt.status === "confirmed")
+    const upcoming = (appointments || []).filter(
+      (apt) => new Date(apt.appointment_date) >= today && apt.status !== "cancelled",
+    )
+    const confirmed = (appointments || []).filter((apt) => apt.status === "confirmed")
     const pending = appointments.filter((apt) => apt.status === "pending")
     const totalRevenue = appointments
       .filter((apt) => apt.status === "completed")
@@ -190,21 +212,37 @@ export default function AppointmentsClient({
   }
 
   const handleEditAppointment = async () => {
-    if (selectedAppointment && formData.client && formData.service) {
-      const response = await fetch(`/api/appointments/${selectedAppointment.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      })
-      if (response.ok) {
-        const updatedAppointment = await response.json()
-        setAppointments(
-          appointments.map((apt) => (apt.id === selectedAppointment.id ? updatedAppointment[0] : apt)),
-        )
-        setIsEditDialogOpen(false)
-        setFormData({})
-        setSelectedAppointment(null)
-      }
+    if (!selectedAppointment) return
+
+    // Construct a clean payload
+    const payload: Partial<Appointment> = {
+      client_id: formData.client_id,
+      artist_id: formData.artist_id,
+      service_id: formData.service_id,
+      appointment_date: formData.appointment_date,
+      start_time: formData.start_time,
+      duration_minutes: formData.duration_minutes,
+      price: formData.price,
+      status: formData.status,
+      notes: formData.notes,
+    }
+
+    const response = await fetch(`/api/appointments/${selectedAppointment.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+
+    if (response.ok) {
+      const updatedAppointment = await response.json()
+      // The API now returns the full nested object, so we can just use it
+      setAppointments(appointments.map((apt) => (apt.id === selectedAppointment.id ? updatedAppointment[0] : apt)))
+      setIsEditDialogOpen(false)
+      setFormData({})
+      setSelectedAppointment(null)
+    } else {
+      // Handle error
+      console.error("Failed to update appointment")
     }
   }
 
@@ -361,10 +399,17 @@ export default function AppointmentsClient({
           <ScrollArea className="h-[600px]">
             <div className="space-y-2 p-4">
               {filteredAppointments.map((appointment) => {
-                const artist = getArtistById(appointment.artistId)
-                const appointmentDate = new Date(appointment.date)
-                const isToday = appointmentDate.toDateString() === new Date().toDateString()
-                const isPast = appointmentDate < new Date()
+                const appointmentDate = appointment.appointment_date
+                  ? new Date(appointment.appointment_date + "T00:00:00")
+                  : null
+                const isToday = appointmentDate && appointmentDate.toDateString() === new Date().toDateString()
+                const isPast = appointmentDate && appointmentDate < new Date() && !isToday
+                const clientName = appointment.clients?.full_name || "Unknown Client"
+                const artistName = appointment.artists?.name || "Unknown Artist"
+                const clientInitials = clientName
+                  .split(" ")
+                  .map((n) => n[0])
+                  .join("")
 
                 return (
                   <Card
@@ -375,22 +420,12 @@ export default function AppointmentsClient({
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
                           <Avatar className="h-10 w-10">
-                            <AvatarImage
-                              src={`/placeholder.svg?height=40&width=40&text=${artist?.name
-                                .split(" ")
-                                .map((n) => n[0])
-                                .join("")}`}
-                            />
-                            <AvatarFallback>
-                              {artist?.name
-                                .split(" ")
-                                .map((n) => n[0])
-                                .join("")}
-                            </AvatarFallback>
+                            <AvatarImage src={`/placeholder.svg?height=40&width=40&text=${clientInitials}`} />
+                            <AvatarFallback>{clientInitials}</AvatarFallback>
                           </Avatar>
                           <div className="space-y-1">
                             <div className="flex items-center gap-2">
-                              <h3 className="font-semibold">{appointment.client}</h3>
+                              <h3 className="font-semibold">{clientName}</h3>
                               <Badge className={getStatusColor(appointment.status)}>{appointment.status}</Badge>
                               {isToday && (
                                 <Badge variant="outline" className="text-blue-600">
@@ -401,25 +436,25 @@ export default function AppointmentsClient({
                             <div className="flex items-center gap-4 text-sm text-muted-foreground">
                               <div className="flex items-center gap-1">
                                 <User className="h-3 w-3" />
-                                {artist?.name}
+                                {artistName}
                               </div>
                               <div className="flex items-center gap-1">
                                 <Calendar className="h-3 w-3" />
-                                {formatDate(appointment.date)}
+                                {formatDate(appointment.appointment_date)}
                               </div>
                               <div className="flex items-center gap-1">
                                 <Clock className="h-3 w-3" />
-                                {formatTime(appointment.startTime)} -{" "}
-                                {formatTime(appointment.startTime + appointment.duration)}
+                                {formatTime(appointment.start_time)} -{" "}
+                                {getEndTime(appointment.start_time, appointment.duration_minutes)}
                               </div>
                               <div className="flex items-center gap-1">
                                 <DollarSign className="h-3 w-3" />${appointment.price}
                               </div>
                             </div>
                             <div className="text-sm text-muted-foreground">
-                              <span className="font-medium">{appointment.service}</span>
-                              {appointment.depositPaid && (
-                                <span className="ml-2">• Deposit: ${appointment.depositPaid}</span>
+                              <span className="font-medium">{appointment.services?.name || "Unknown Service"}</span>
+                              {appointment.deposit_paid && (
+                                <span className="ml-2">• Deposit: ${appointment.deposit_paid}</span>
                               )}
                             </div>
                           </div>
@@ -502,7 +537,7 @@ export default function AppointmentsClient({
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="text-sm font-medium text-muted-foreground">Client</Label>
-                  <p className="text-sm font-semibold">{selectedAppointment.client}</p>
+                  <p className="text-sm font-semibold">{selectedAppointment.clients?.full_name}</p>
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-muted-foreground">Status</Label>
@@ -512,23 +547,23 @@ export default function AppointmentsClient({
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="text-sm font-medium text-muted-foreground">Artist</Label>
-                  <p className="text-sm">{getArtistById(selectedAppointment.artistId)?.name}</p>
+                  <p className="text-sm">{selectedAppointment.artists?.name}</p>
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-muted-foreground">Service</Label>
-                  <p className="text-sm">{selectedAppointment.service}</p>
+                  <p className="text-sm">{selectedAppointment.services?.name}</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="text-sm font-medium text-muted-foreground">Date</Label>
-                  <p className="text-sm">{formatDate(selectedAppointment.date)}</p>
+                  <p className="text-sm">{formatDate(selectedAppointment.appointment_date)}</p>
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-muted-foreground">Time</Label>
                   <p className="text-sm">
-                    {formatTime(selectedAppointment.startTime)} -{" "}
-                    {formatTime(selectedAppointment.startTime + selectedAppointment.duration)}
+                    {formatTime(selectedAppointment.start_time)} -{" "}
+                    {getEndTime(selectedAppointment.start_time, selectedAppointment.duration_minutes)}
                   </p>
                 </div>
               </div>
@@ -536,7 +571,8 @@ export default function AppointmentsClient({
                 <div>
                   <Label className="text-sm font-medium text-muted-foreground">Duration</Label>
                   <p className="text-sm">
-                    {selectedAppointment.duration} hour{selectedAppointment.duration !== 1 ? "s" : ""}
+                    {selectedAppointment.duration_minutes} minute
+                    {selectedAppointment.duration_minutes !== 1 ? "s" : ""}
                   </p>
                 </div>
                 <div>
@@ -544,16 +580,16 @@ export default function AppointmentsClient({
                   <p className="text-sm font-semibold">${selectedAppointment.price}</p>
                 </div>
               </div>
-              {selectedAppointment.depositPaid && (
+              {selectedAppointment.deposit_paid && (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label className="text-sm font-medium text-muted-foreground">Deposit Paid</Label>
-                    <p className="text-sm">${selectedAppointment.depositPaid}</p>
+                    <p className="text-sm">${selectedAppointment.deposit_paid}</p>
                   </div>
                   <div>
                     <Label className="text-sm font-medium text-muted-foreground">Balance Due</Label>
                     <p className="text-sm font-semibold">
-                      ${(selectedAppointment.price || 0) - (selectedAppointment.depositPaid || 0)}
+                      ${(selectedAppointment.price || 0) - (selectedAppointment.deposit_paid || 0)}
                     </p>
                   </div>
                 </div>
@@ -561,11 +597,11 @@ export default function AppointmentsClient({
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="text-sm font-medium text-muted-foreground">Phone</Label>
-                  <p className="text-sm">{selectedAppointment.phone}</p>
+                  <p className="text-sm">{selectedAppointment.clients?.phone}</p>
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-muted-foreground">Email</Label>
-                  <p className="text-sm">{selectedAppointment.email || "Not provided"}</p>
+                  <p className="text-sm">{selectedAppointment.clients?.email || "Not provided"}</p>
                 </div>
               </div>
               {selectedAppointment.notes && (
@@ -576,7 +612,9 @@ export default function AppointmentsClient({
               )}
               <div>
                 <Label className="text-sm font-medium text-muted-foreground">Booked On</Label>
-                <p className="text-sm">{new Date(selectedAppointment.createdAt).toLocaleString()}</p>
+                <p className="text-sm">
+                  {selectedAppointment.created_at ? new Date(selectedAppointment.created_at).toLocaleString() : "N/A"}
+                </p>
               </div>
             </div>
           )}
@@ -606,41 +644,87 @@ export default function AppointmentsClient({
             <DialogDescription>Update appointment details.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="edit-client">Client Name</Label>
-                <Input
-                  id="edit-client"
-                  value={formData.client || ""}
-                  onChange={(e) => setFormData({ ...formData, client: e.target.value })}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="edit-phone">Phone</Label>
-                <Input
-                  id="edit-phone"
-                  value={formData.phone || ""}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                />
-              </div>
-            </div>
             <div className="grid gap-2">
-              <Label htmlFor="edit-service">Service</Label>
+              <Label htmlFor="edit-client">Client</Label>
               <Select
-                value={formData.service || ""}
-                onValueChange={(value) => setFormData({ ...formData, service: value })}
+                value={formData.client_id?.toString() || ""}
+                onValueChange={(value) => setFormData({ ...formData, client_id: Number(value) })}
               >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Select a client" />
                 </SelectTrigger>
                 <SelectContent>
-                  {services.map((service) => (
-                    <SelectItem key={service.id} value={service.name}>
-                      {service.name}
+                  {clients.map((client) => (
+                    <SelectItem key={client.id} value={client.id.toString()}>
+                      {client.full_name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-service">Service</Label>
+              <Select
+                value={formData.service_id?.toString() || ""}
+                onValueChange={(value) => {
+                  const service = services.find((s) => s.id === Number(value))
+                  setFormData({
+                    ...formData,
+                    service_id: Number(value),
+                    price: service?.price,
+                    duration_minutes: service?.duration_minutes,
+                  })
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a service" />
+                </SelectTrigger>
+                <SelectContent>
+                  {services.map((service) => (
+                    <SelectItem key={service.id} value={service.id.toString()}>
+                      {service.name} ({service.duration_minutes} min) - ${service.price}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-artist">Artist</Label>
+              <Select
+                value={formData.artist_id?.toString() || ""}
+                onValueChange={(value) => setFormData({ ...formData, artist_id: Number(value) })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select an artist" />
+                </SelectTrigger>
+                <SelectContent>
+                  {artists.map((artist) => (
+                    <SelectItem key={artist.id} value={artist.id.toString()}>
+                      {artist.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-date">Date</Label>
+                <Input
+                  id="edit-date"
+                  type="date"
+                  value={formData.appointment_date || ""}
+                  onChange={(e) => setFormData({ ...formData, appointment_date: e.target.value })}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-time">Time</Label>
+                <Input
+                  id="edit-time"
+                  type="time"
+                  value={formData.start_time || ""}
+                  onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
+                />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
@@ -649,7 +733,7 @@ export default function AppointmentsClient({
                   id="edit-price"
                   type="number"
                   value={formData.price || ""}
-                  onChange={(e) => setFormData({ ...formData, price: Number.parseInt(e.target.value) })}
+                  onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })}
                 />
               </div>
               <div className="grid gap-2">
@@ -696,8 +780,8 @@ export default function AppointmentsClient({
           <AlertDialogHeader>
             <AlertDialogTitle>Cancel Appointment</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to cancel the appointment for {selectedAppointment?.client}? This action cannot be
-              undone.
+              Are you sure you want to cancel the appointment for {selectedAppointment?.clients?.full_name}? This
+              action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

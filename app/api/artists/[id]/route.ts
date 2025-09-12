@@ -2,10 +2,10 @@ import { createServerSupabase } from "@/lib/supabase/server-client"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 
-export async function GET(request: Request) {
+export async function GET(request: Request, { params }: { params: { id: string } }) {
   const cookieStore = await cookies()
   const supabase = createServerSupabase(cookieStore)
-  const id = request.url.split("/").pop()
+  const id = params.id
 
   // Step 1: Fetch the artist
   const { data: artist, error: artistError } = await supabase
@@ -36,10 +36,10 @@ export async function GET(request: Request) {
   return NextResponse.json(artist)
 }
 
-export async function PUT(request: Request) {
+export async function PUT(request: Request, { params }: { params: { id: string } }) {
   const cookieStore = await cookies()
   const supabase = createServerSupabase(cookieStore)
-  const id = request.url.split("/").pop()
+  const id = params.id
 
   const { data: artist, error } = await supabase
     .from("artists")
@@ -54,10 +54,10 @@ export async function PUT(request: Request) {
   return NextResponse.json(artist)
 }
 
-export async function DELETE(request: Request) {
+export async function DELETE(request: Request, { params }: { params: { id: string } }) {
   const cookieStore = await cookies()
   const supabase = createServerSupabase(cookieStore)
-  const id = request.url.split("/").pop()
+  const id = params.id
 
   const { data: artist, error } = await supabase.from("artists").delete().eq("id", id)
 

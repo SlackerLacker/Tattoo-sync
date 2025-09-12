@@ -75,7 +75,7 @@ export default function ClientsClient({ clients: initialClients }: ClientsClient
 
   const handleAddClient = async () => {
     setFormError(null)
-    if (formData.name && formData.email) {
+    if (formData.full_name && formData.email) {
       const response = await fetch("/api/clients", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -83,12 +83,12 @@ export default function ClientsClient({ clients: initialClients }: ClientsClient
       })
       if (response.ok) {
         const newClient = await response.json()
-        setClients([...clients, newClient[0]])
+        setClients([...(clients || []), newClient])
         setIsAddDialogOpen(false)
         resetForm()
       } else {
-        const errorMessage = await response.text()
-        setFormError(errorMessage)
+        const { error } = await response.json()
+        setFormError(error)
       }
     } else {
       setFormError("Full Name and Email are required.")
@@ -97,7 +97,7 @@ export default function ClientsClient({ clients: initialClients }: ClientsClient
 
   const handleEditClient = async () => {
     setFormError(null)
-    if (selectedClient && formData.name && formData.email) {
+    if (selectedClient && formData.full_name && formData.email) {
       const response = await fetch(`/api/clients/${selectedClient.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -105,12 +105,14 @@ export default function ClientsClient({ clients: initialClients }: ClientsClient
       })
       if (response.ok) {
         const updatedClient = await response.json()
-        setClients(clients.map((client) => (client.id === selectedClient.id ? updatedClient[0] : client)))
+        setClients(
+          (clients || []).map((client) => (client.id === selectedClient.id ? updatedClient[0] : client)),
+        )
         setIsEditDialogOpen(false)
         resetForm()
       } else {
-        const errorMessage = await response.text()
-        setFormError(errorMessage)
+        const { error } = await response.json()
+        setFormError(error)
       }
     } else {
       setFormError("Full Name and Email are required.")
@@ -176,8 +178,8 @@ export default function ClientsClient({ clients: initialClients }: ClientsClient
                   <Input
                     id="name"
                     placeholder="Enter full name"
-                    value={formData.name || ""}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    value={formData.full_name || ""}
+                    onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
                   />
                 </div>
                 <div className="grid gap-2">
@@ -455,8 +457,8 @@ export default function ClientsClient({ clients: initialClients }: ClientsClient
                 <Input
                   id="edit-name"
                   placeholder="Enter full name"
-                  value={formData.name || ""}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    value={formData.full_name || ""}
+                    onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
                 />
               </div>
               <div className="grid gap-2">

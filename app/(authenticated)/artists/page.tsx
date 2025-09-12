@@ -7,5 +7,5 @@ export default async function ArtistsPage() {
   const supabase = createServerSupabase(cookieStore)
   const { data: artists } = await supabase.from("artists").select("*")
 
-  return <ArtistsClient artists={artists} />
+  return <ArtistsClient artists={artists || []} />
 }

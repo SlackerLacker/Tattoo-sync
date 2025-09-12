@@ -7,5 +7,5 @@ export default async function ClientsPage() {
   const supabase = createServerSupabase(cookieStore)
   const { data: clients } = await supabase.from("clients").select("*")
 
-  return <ClientsClient clients={clients} />
+  return <ClientsClient clients={clients || []} />
 }

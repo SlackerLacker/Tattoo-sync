@@ -7,7 +7,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
   const supabase = createServerSupabase(cookieStore)
   const { data: appointment, error } = await supabase
     .from("appointments")
-    .select("*")
+    .select("*, clients:clients(*), artists:artists(*), services:services(*)")
     .eq("id", params.id)
     .single()
 
@@ -25,6 +25,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     .from("appointments")
     .update(await request.json())
     .eq("id", params.id)
+    .select("*, clients:clients(*), artists:artists(*), services:services(*)")
 
   if (error) {
     return new NextResponse(error.message, { status: 500 })
