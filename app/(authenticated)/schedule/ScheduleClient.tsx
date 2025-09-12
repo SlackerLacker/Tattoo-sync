@@ -840,10 +840,10 @@ export default function ScheduleClient({
     setSelectedAppointment(appointment)
     setFormData({
       ...appointment,
-      client_id: appointment.client_id,
-      service_id: appointment.service_id,
-      artist_id: appointment.artist_id,
+      // Format start_time to HH:mm for the input field
+      start_time: appointment.start_time ? appointment.start_time.substring(0, 5) : "",
     })
+    setShowNewClientFields(false) // Ensure we're in "select existing" mode when editing
     setIsEditDialogOpen(true)
   }
 
@@ -875,14 +875,13 @@ export default function ScheduleClient({
     const selectedService = services.find((s) => s.id === Number(serviceId))
     if (!selectedService) return
 
-    const updatedFormData = {
-      ...formData,
+    setFormData((prev) => ({
+      ...prev,
       service_id: selectedService.id,
-      duration_minutes: isEditDialogOpen ? formData.duration_minutes : selectedService.duration_minutes,
-      price: isEditDialogOpen ? formData.price : selectedService.price,
-    }
-
-    setFormData(updatedFormData)
+      // Only set price and duration if they are not already set (i.e., for new appointments)
+      duration_minutes: prev.duration_minutes || selectedService.duration_minutes,
+      price: prev.price || selectedService.price,
+    }))
   }
 
   const handleDurationChange = (durationInMinutes: number) => {
@@ -1896,7 +1895,15 @@ export default function ScheduleClient({
               >
                 Cancel
               </Button>
-              <Button onClick={isEditDialogOpen ? handleEditAppointment : handleCreateAppointment}>
+              <Button
+                onClick={isEditDialogOpen ? handleEditAppointment : handleCreateAppointment}
+                disabled={
+                  (!showNewClientFields && !formData.client_id && !isEditDialogOpen) ||
+                  (showNewClientFields && !formData.client_full_name) ||
+                  !formData.service_id ||
+                  !formData.artist_id
+                }
+              >
                 {isEditDialogOpen ? "Update Appointment" : "Create Appointment"}
               </Button>
             </div>
