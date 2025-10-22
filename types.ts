@@ -1,18 +1,21 @@
 export interface Appointment {
-  id: number
-  artistId: number
-  client: string
-  service: string
-  date: string
-  startTime: number
+  id: string
+  artist_id: string
+  client_id: string
+  service_id: string
+  appointment_date: string
+  start_time: string
   duration: number
-  status: "confirmed" | "pending" | "cancelled" | "completed"
-  phone: string
-  email?: string
+  status: "confirmed" | "pending" | "cancelled" | "completed" | "in-progress"
   notes?: string
   price?: number
-  depositPaid?: number
-  createdAt: string
+  deposit_paid?: number
+  created_at: string
+  payment_status?: "paid" | "unpaid" | "deposit"
+  payment_method?: string
+  clients?: Client // For joined data
+  artists?: Artist // For joined data
+  services?: Service // For joined data
 }
 
 export const specialtyOptions = [
@@ -72,7 +75,7 @@ export interface PortfolioItem {
 }
 
 export interface Artist {
-  id: number
+  id: string
   name: string
   email: string
   phone: string
@@ -95,8 +98,8 @@ export interface Artist {
 }
 
 export interface Client {
-  id: number
-  name: string
+  id: string
+  full_name: string
   email: string
   phone: string
   totalAppointments: number
@@ -111,7 +114,7 @@ export interface Client {
 }
 
 export interface Service {
-  id: number
+  id: string
   name: string
   description: string
   price: number
