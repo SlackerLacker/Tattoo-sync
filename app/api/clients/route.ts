@@ -41,19 +41,44 @@ export async function POST(request: Request) {
     delete clientData.name
   }
 
-  const { data: newClient, error: rpcError } = await supabase.rpc(
-    "create_client_with_profile",
-    {
-      p_full_name: clientData.full_name,
-      p_email: clientData.email,
-      p_phone: clientData.phone || null,
-      p_studio_id: userProfile.studio_id,
-    },
-  )
+  // The RPC function 'create_client_with_profile' is causing a not-null violation on the profiles.id.
+  // Instead of relying on the broken function, we will perform the inserts directly from the code.
 
-  if (rpcError) {
-    console.error("Supabase RPC error:", rpcError)
-    return new NextResponse(rpcError.message, { status: 500 })
+  // Step 1: Generate a new UUID for the client. This will be used for both profiles and clients tables.
+  const newClientId = crypto.randomUUID()
+
+  // Step 2: Insert into the 'profiles' table.
+  const { error: profileInsertError } = await supabase.from("profiles").insert({
+    id: newClientId,
+    full_name: clientData.full_name,
+    email: clientData.email,
+    studio_id: userProfile.studio_id,
+    role: "client",
+  })
+
+  if (profileInsertError) {
+    console.error("Error creating profile for client:", profileInsertError)
+    return new NextResponse(profileInsertError.message, { status: 500 })
+  }
+
+  // Step 3: Insert into the 'clients' table.
+  const { data: newClient, error: clientInsertError } = await supabase
+    .from("clients")
+    .insert({
+      id: newClientId,
+      full_name: clientData.full_name,
+      email: clientData.email,
+      phone: clientData.phone || null,
+      studio_id: userProfile.studio_id,
+    })
+    .select()
+    .single()
+
+  if (clientInsertError) {
+    console.error("Error creating client record:", clientInsertError)
+    // Attempt to roll back the profile creation if the client creation fails.
+    await supabase.from("profiles").delete().eq("id", newClientId)
+    return new NextResponse(clientInsertError.message, { status: 500 })
   }
 
   return NextResponse.json(newClient)
