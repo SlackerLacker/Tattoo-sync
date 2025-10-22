@@ -884,7 +884,7 @@ export default function ScheduleClient({
 
     setFormData((prev) => ({
       ...prev,
-      service_id: Number(selectedService.id),
+      service_id: selectedService.id,
       // Only set price and duration if they are not already set (i.e., for new appointments)
       duration: prev.duration || selectedService.duration,
       price: prev.price || selectedService.price,
@@ -907,7 +907,7 @@ export default function ScheduleClient({
   const handleArtistChange = (artistId: string) => {
     const updatedFormData = {
       ...formData,
-      artist_id: Number(artistId),
+      artist_id: artistId,
     }
 
     if (updatedFormData.duration) {
@@ -1720,7 +1720,7 @@ export default function ScheduleClient({
                     setFormData({ ...formData, client_id: undefined })
                   } else {
                     setShowNewClientFields(false)
-                    setFormData({ ...formData, client_id: Number(value) })
+                    setFormData({ ...formData, client_id: value })
                   }
                 }}
               >
