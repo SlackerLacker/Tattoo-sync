@@ -36,13 +36,11 @@ export async function POST(request: Request) {
   }
 
   const appointmentData = await request.json()
-  console.log("Received appointment data:", appointmentData)
   appointmentData.studio_id = profile.studio_id
 
   const { data: appointment, error } = await supabase.from("appointments").insert([appointmentData]).select()
 
   if (error) {
-    console.error("Error creating appointment:", error)
     return new NextResponse(error.message, { status: 500 })
   }
 
