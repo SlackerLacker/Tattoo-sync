@@ -97,7 +97,7 @@ const paymentMethods = [
 
 interface DragSelection {
   isDragging: boolean
-  artistId: number | null
+  artistId: string | null
   startTime: number | null
   endTime: number | null
   currentTime: number | null
@@ -115,6 +115,13 @@ const timeToDecimal = (time: string | null | undefined): number => {
   if (!time) return 0
   const [hours, minutes] = time.split(":").map(Number)
   return hours + minutes / 60
+}
+
+// Helper to convert a decimal hour to a HH:mm string
+const decimalToTimeString = (decimal: number): string => {
+  const hours = Math.floor(decimal)
+  const minutes = Math.round((decimal % 1) * 60)
+  return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`
 }
 
 export default function ScheduleClient({
@@ -220,7 +227,7 @@ export default function ScheduleClient({
 
   // Check if artist is available at specific time
   // This is a simplified check. A more robust solution would involve checking artist-specific schedules.
-  const isArtistAvailable = (artistId: number, time: number, date: Date) => {
+  const isArtistAvailable = (artistId: string, time: number, date: Date) => {
     const artist = artists.find((a) => a.id === artistId)
     if (!artist) return false
 
@@ -251,7 +258,7 @@ export default function ScheduleClient({
   }
 
   // Get appointments that START in this specific time slot
-  const getAppointmentsStartingInSlot = (artistId: number, time: number) => {
+  const getAppointmentsStartingInSlot = (artistId: string, time: number) => {
     const currentDateStr = currentDate.toISOString().split("T")[0]
     return appointments.filter((apt) => {
       const aptStartTime = timeToDecimal(apt.start_time)
@@ -259,14 +266,14 @@ export default function ScheduleClient({
     })
   }
 
-  const isAvailable = (artistId: number, time: number) => {
+  const isAvailable = (artistId: string, time: number) => {
     const currentDateStr = currentDate.toISOString().split("T")[0]
 
     if (!isShopOpen(time, currentDate) || !isArtistAvailable(artistId, time, currentDate)) return false
 
     const hasAppointment = appointments.some((apt) => {
       const aptStartTime = timeToDecimal(apt.start_time)
-      const aptDuration = (apt.duration_minutes || 60) / 60 // default to 1 hour
+      const aptDuration = (apt.duration || 60) / 60 // default to 1 hour
       return (
         apt.artist_id === artistId &&
         apt.appointment_date === currentDateStr &&
@@ -278,12 +285,12 @@ export default function ScheduleClient({
     return !hasAppointment
   }
 
-  const getSlotStatus = (artistId: number, time: number) => {
+  const getSlotStatus = (artistId: string, time: number) => {
     const currentDateStr = currentDate.toISOString().split("T")[0]
 
     const appointment = appointments.find((apt) => {
       const aptStartTime = timeToDecimal(apt.start_time)
-      const aptDuration = (apt.duration_minutes || 60) / 60
+      const aptDuration = (apt.duration || 60) / 60
       return (
         apt.artist_id === artistId &&
         apt.appointment_date === currentDateStr &&
@@ -402,7 +409,7 @@ export default function ScheduleClient({
     )
   }
 
-  const getArtistById = (id: number | null | undefined) => {
+  const getArtistById = (id: any | null | undefined) => {
     if (!id) return null
     return artists.find((artist) => artist.id === id)
   }
@@ -423,10 +430,10 @@ export default function ScheduleClient({
 
   const stats = getStats()
 
-  const calculatePrice = (artistId: number | null | undefined, durationInMinutes: number | null | undefined) => {
+  const calculatePrice = (artistId: any | null | undefined, duration: number | null | undefined) => {
     const artist = getArtistById(artistId)
-    if (!artist || !durationInMinutes) return 0
-    const durationInHours = durationInMinutes / 60
+    if (!artist || !duration) return 0
+    const durationInHours = duration / 60
     return Math.round((artist.hourlyRate || 100) * durationInHours)
   }
 
@@ -447,7 +454,7 @@ export default function ScheduleClient({
   }
 
   // Drag selection handlers
-  const handleMouseDown = useCallback((artistId: number, time: number, event: React.MouseEvent) => {
+  const handleMouseDown = useCallback((artistId: string, time: number, event: React.MouseEvent) => {
     if (!isAvailable(artistId, time)) return
 
     event.preventDefault()
@@ -461,7 +468,7 @@ export default function ScheduleClient({
   }, [])
 
   const handleMouseEnter = useCallback(
-    (artistId: number, time: number) => {
+    (artistId: string, time: number) => {
       if (dragSelection.isDragging && dragSelection.artistId === artistId) {
         setDragSelection((prev) => ({
           ...prev,
@@ -486,14 +493,14 @@ export default function ScheduleClient({
 
       if (allSlotsAvailable && dragSelection.artistId) {
         const currentDateStr = currentDate.toISOString().split("T")[0]
-        const durationInMinutes = duration * 60
+        const durationValue = duration * 60
         setFormData({
           artist_id: dragSelection.artistId,
-          start_time: `${Math.floor(startTime)}:${(startTime % 1) * 60}:00`,
-          duration_minutes: durationInMinutes,
+          start_time: decimalToTimeString(startTime),
+          duration: durationValue,
           appointment_date: currentDateStr,
           status: "pending",
-          price: calculatePrice(dragSelection.artistId, durationInMinutes),
+          price: calculatePrice(dragSelection.artistId, durationValue),
         })
         setIsNewAppointmentDialogOpen(true)
       }
@@ -531,13 +538,13 @@ export default function ScheduleClient({
   )
 
   const handleSlotDrop = useCallback(
-    (artistId: number, time: number, event: React.DragEvent) => {
+    (artistId: string, time: number, event: React.DragEvent) => {
       event.preventDefault()
 
       if (!draggedAppointment || !isDraggingAppointment) return
 
       const currentDateStr = currentDate.toISOString().split("T")[0]
-      const appointmentDurationHours = (draggedAppointment.duration_minutes || 60) / 60
+      const appointmentDurationHours = (draggedAppointment.duration || 60) / 60
       const appointmentEndTime = time + appointmentDurationHours
       const slotsNeeded = []
       for (let t = time; t < appointmentEndTime; t += 0.25) {
@@ -554,7 +561,7 @@ export default function ScheduleClient({
             apt.artist_id === artistId &&
             apt.appointment_date === currentDateStr &&
             slot >= timeToDecimal(apt.start_time) &&
-            slot < timeToDecimal(apt.start_time) + (apt.duration_minutes || 60) / 60,
+            slot < timeToDecimal(apt.start_time) + (apt.duration || 60) / 60,
         )
         return !hasConflict
       })
@@ -587,7 +594,7 @@ export default function ScheduleClient({
   )
 
   // Check if a time slot is in the drag selection
-  const isInDragSelection = (artistId: number, time: number) => {
+  const isInDragSelection = (artistId: string, time: number) => {
     if (!dragSelection.isDragging || dragSelection.artistId !== artistId) return false
     if (dragSelection.startTime === null || dragSelection.currentTime === null) return false
 
@@ -597,17 +604,17 @@ export default function ScheduleClient({
     return time >= start && time <= end
   }
 
-  const handleSlotClick = (artistId: number, time: number) => {
+  const handleSlotClick = (artistId: string, time: number) => {
     if (isAvailable(artistId, time)) {
       const currentDateStr = currentDate.toISOString().split("T")[0]
-      const durationInMinutes = 60
+      const duration = 60
       setFormData({
         artist_id: artistId,
-        start_time: `${Math.floor(time)}:${(time % 1) * 60}:00`,
-        duration_minutes: durationInMinutes,
+        start_time: decimalToTimeString(time),
+        duration: duration,
         appointment_date: currentDateStr,
         status: "pending",
-        price: calculatePrice(artistId, durationInMinutes),
+        price: calculatePrice(artistId, duration),
       })
       setIsNewAppointmentDialogOpen(true)
     }
@@ -618,7 +625,7 @@ export default function ScheduleClient({
       status: "pending",
       appointment_date: currentDate.toISOString().split("T")[0],
       start_time: "09:00:00",
-      duration_minutes: 60,
+      duration: 60,
     })
     setIsNewAppointmentDialogOpen(true)
   }
@@ -665,7 +672,7 @@ export default function ScheduleClient({
       service_id: formData.service_id,
       appointment_date: formData.appointment_date,
       start_time: formData.start_time,
-      duration_minutes: formData.duration_minutes,
+      duration: formData.duration,
       price: formData.price,
       status: formData.status,
       notes: formData.notes,
@@ -857,7 +864,7 @@ export default function ScheduleClient({
     setIsCheckoutDialogOpen(true)
   }
 
-  const updateAppointmentStatus = async (appointmentId: number, newStatus: Appointment["status"]) => {
+  const updateAppointmentStatus = async (appointmentId: any, newStatus: Appointment["status"]) => {
     const response = await fetch(`/api/appointments/${appointmentId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -872,26 +879,26 @@ export default function ScheduleClient({
   }
 
   const handleServiceChange = (serviceId: string) => {
-    const selectedService = services.find((s) => s.id === Number(serviceId))
+    const selectedService = services.find((s) => s.id === serviceId)
     if (!selectedService) return
 
     setFormData((prev) => ({
       ...prev,
       service_id: selectedService.id,
       // Only set price and duration if they are not already set (i.e., for new appointments)
-      duration_minutes: prev.duration_minutes || selectedService.duration_minutes,
+      duration: prev.duration || selectedService.duration,
       price: prev.price || selectedService.price,
     }))
   }
 
-  const handleDurationChange = (durationInMinutes: number) => {
+  const handleDurationChange = (duration: number) => {
     const updatedFormData = {
       ...formData,
-      duration_minutes: durationInMinutes,
+      duration: duration,
     }
 
     if (updatedFormData.artist_id) {
-      updatedFormData.price = calculatePrice(updatedFormData.artist_id, durationInMinutes)
+      updatedFormData.price = calculatePrice(updatedFormData.artist_id, duration)
     }
 
     setFormData(updatedFormData)
@@ -900,18 +907,18 @@ export default function ScheduleClient({
   const handleArtistChange = (artistId: string) => {
     const updatedFormData = {
       ...formData,
-      artist_id: Number(artistId),
+      artist_id: artistId,
     }
 
-    if (updatedFormData.duration_minutes) {
-      updatedFormData.price = calculatePrice(Number(artistId), updatedFormData.duration_minutes)
+    if (updatedFormData.duration) {
+      updatedFormData.price = calculatePrice(artistId, updatedFormData.duration)
     }
 
     setFormData(updatedFormData)
   }
 
   // Get available time slots for artist selection in new appointment dialog
-  const getAvailableTimeSlotsForArtist = (artistId: number, date: string) => {
+  const getAvailableTimeSlotsForArtist = (artistId: string, date: string) => {
     const appointmentDate = new Date(date)
     const availableSlots = getTimeSlots(appointmentDate)
 
@@ -941,7 +948,7 @@ export default function ScheduleClient({
 
     // Artist filter
     if (artistFilter !== "all") {
-      filtered = filtered.filter((apt) => apt.artist_id === Number(artistFilter))
+      filtered = filtered.filter((apt) => apt.artist_id === artistFilter)
     }
 
     // Date filter
@@ -1196,7 +1203,7 @@ export default function ScheduleClient({
                                         : ""
                                     }`}
                                     style={{
-                                      height: `${((appointment.duration_minutes || 60) / 60) * 120 - 8}px`,
+                                      height: `${((appointment.duration || 60) / 60) * 120 - 8}px`,
                                     }}
                                     draggable={true}
                                     onDragStart={(e) => handleAppointmentDragStart(appointment, e)}
@@ -1308,9 +1315,9 @@ export default function ScheduleClient({
             {artists.map((artist) => {
               const currentDateStr = currentDate.toISOString().split("T")[0]
               const artistAppointments = appointments.filter(
-                (apt) => apt.artist_id === artist.id && apt.appointment_date === currentDateStr,
+                (apt) => apt.artist_id == artist.id && apt.appointment_date === currentDateStr,
               )
-              const totalMinutes = artistAppointments.reduce((sum, apt) => sum + (apt.duration_minutes || 0), 0)
+              const totalMinutes = artistAppointments.reduce((sum, apt) => sum + (apt.duration || 0), 0)
               const totalHours = totalMinutes / 60
               const totalRevenue = artistAppointments.reduce((sum, apt) => sum + (apt.price || 0), 0)
 
@@ -1495,7 +1502,7 @@ export default function ScheduleClient({
                                     {formatTime(timeToDecimal(appointment.start_time))} -{" "}
                                     {formatTime(
                                       timeToDecimal(appointment.start_time) +
-                                        (appointment.duration_minutes || 0) / 60,
+                                        (appointment.duration || 0) / 60,
                                     )}
                                   </div>
                                   <div className="flex items-center gap-1">
@@ -1620,15 +1627,15 @@ export default function ScheduleClient({
                     {formatTime(timeToDecimal(selectedAppointment.start_time))} -{" "}
                     {formatTime(
                       timeToDecimal(selectedAppointment.start_time) +
-                        (selectedAppointment.duration_minutes || 0) / 60,
+                        (selectedAppointment.duration || 0) / 60,
                     )}
                   </p>
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-gray-500">Duration</Label>
                   <p>
-                    {selectedAppointment.duration_minutes} minute
-                    {selectedAppointment.duration_minutes !== 1 ? "s" : ""}
+                    {selectedAppointment.duration} minute
+                    {selectedAppointment.duration !== 1 ? "s" : ""}
                   </p>
                 </div>
               </div>
@@ -1713,7 +1720,7 @@ export default function ScheduleClient({
                     setFormData({ ...formData, client_id: undefined })
                   } else {
                     setShowNewClientFields(false)
-                    setFormData({ ...formData, client_id: Number(value) })
+                    setFormData({ ...formData, client_id: value })
                   }
                 }}
               >
@@ -1797,7 +1804,7 @@ export default function ScheduleClient({
                   <SelectContent>
                     {services.map((service) => (
                       <SelectItem key={service.id} value={service.id.toString()}>
-                        {service.name} ({service.duration_minutes} min)
+                        {service.name} ({service.duration} min)
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1825,11 +1832,11 @@ export default function ScheduleClient({
                 />
               </div>
               <div>
-                <Label htmlFor="duration_minutes">Duration (minutes) *</Label>
+                <Label htmlFor="duration">Duration (minutes) *</Label>
                 <Input
-                  id="duration_minutes"
+                  id="duration"
                   type="number"
-                  value={formData.duration_minutes || ""}
+                  value={formData.duration || ""}
                   onChange={(e) => handleDurationChange(Number(e.target.value))}
                 />
               </div>
