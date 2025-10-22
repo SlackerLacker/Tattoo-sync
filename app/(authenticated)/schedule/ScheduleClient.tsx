@@ -261,8 +261,11 @@ export default function ScheduleClient({
   const getAppointmentsStartingInSlot = (artistId: string, time: number) => {
     const currentDateStr = currentDate.toISOString().split("T")[0]
     return appointments.filter((apt) => {
+      if (!apt.appointment_date) return false
       const aptStartTime = timeToDecimal(apt.start_time)
-      return apt.artist_id === artistId && apt.appointment_date === currentDateStr && aptStartTime === time
+      return (
+        apt.artist_id === artistId && apt.appointment_date.startsWith(currentDateStr) && aptStartTime === time
+      )
     })
   }
 
@@ -272,11 +275,12 @@ export default function ScheduleClient({
     if (!isShopOpen(time, currentDate) || !isArtistAvailable(artistId, time, currentDate)) return false
 
     const hasAppointment = appointments.some((apt) => {
+      if (!apt.appointment_date) return false
       const aptStartTime = timeToDecimal(apt.start_time)
       const aptDuration = (apt.duration || 60) / 60 // default to 1 hour
       return (
         apt.artist_id === artistId &&
-        apt.appointment_date === currentDateStr &&
+        apt.appointment_date.startsWith(currentDateStr) &&
         time >= aptStartTime &&
         time < aptStartTime + aptDuration
       )
@@ -289,11 +293,12 @@ export default function ScheduleClient({
     const currentDateStr = currentDate.toISOString().split("T")[0]
 
     const appointment = appointments.find((apt) => {
+      if (!apt.appointment_date) return false
       const aptStartTime = timeToDecimal(apt.start_time)
       const aptDuration = (apt.duration || 60) / 60
       return (
         apt.artist_id === artistId &&
-        apt.appointment_date === currentDateStr &&
+        apt.appointment_date.startsWith(currentDateStr) &&
         time >= aptStartTime &&
         time < aptStartTime + aptDuration
       )
