@@ -686,8 +686,23 @@ export default function ScheduleClient({
     })
 
     if (appointmentResponse.ok) {
-      const newAppointment = await appointmentResponse.json()
-      setAppointments([...appointments, newAppointment[0]])
+      const newAppointmentResult = await appointmentResponse.json()
+      const newAppointment = newAppointmentResult[0]
+
+      // Manually construct the full appointment object for immediate UI update
+      // The API returns a flat object, but the calendar component needs the nested objects
+      const client = clients.find((c) => c.id === newAppointment.client_id)
+      const artist = artists.find((a) => a.id === newAppointment.artist_id)
+      const service = services.find((s) => s.id === newAppointment.service_id)
+
+      const enrichedAppointment = {
+        ...newAppointment,
+        clients: client,
+        artists: artist,
+        services: service,
+      }
+
+      setAppointments([...appointments, enrichedAppointment])
       setIsNewAppointmentDialogOpen(false)
       resetForm()
     } else {
