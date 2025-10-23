@@ -543,7 +543,7 @@ export default function ScheduleClient({
   )
 
   const handleSlotDrop = useCallback(
-    (artistId: string, time: number, event: React.DragEvent) => {
+    async (artistId: string, time: number, event: React.DragEvent) => {
       event.preventDefault()
 
       if (!draggedAppointment || !isDraggingAppointment) return
