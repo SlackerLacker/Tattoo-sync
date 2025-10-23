@@ -587,11 +587,24 @@ export default function ScheduleClient({
 
         if (response.ok) {
           const updatedAppointmentResult = await response.json()
-          const updatedAppointment = updatedAppointmentResult[0]
+          const flatAppointment = updatedAppointmentResult[0]
 
-          // The API returns an enriched object, so we can just use it
-          setAppointments(
-            appointments.map((apt) => (apt.id === draggedAppointment.id ? updatedAppointment : apt)),
+          // The API returns a flat object. We need to manually reconstruct the
+          // 'enriched' object with nested client, artist, and service details
+          // to keep the UI state consistent for subsequent drags.
+          const client = clients.find((c) => c.id === flatAppointment.client_id)
+          const artist = artists.find((a) => a.id === flatAppointment.artist_id)
+          const service = services.find((s) => s.id === flatAppointment.service_id)
+
+          const enrichedAppointment = {
+            ...flatAppointment,
+            clients: client,
+            artists: artist,
+            services: service,
+          }
+
+          setAppointments((prevAppointments) =>
+            prevAppointments.map((apt) => (apt.id === draggedAppointment.id ? enrichedAppointment : apt)),
           )
         } else {
           // If the API call fails, we don't update the UI
