@@ -572,16 +572,10 @@ export default function ScheduleClient({
       })
 
       if (allSlotsAvailable) {
-        const newStartTime = `${Math.floor(time)}:${(time % 1) * 60}:00`
-        const updatedAppointments = appointments.map((apt) =>
-          apt.id === draggedAppointment.id
-            ? { ...apt, artist_id: artistId, start_time: newStartTime, appointment_date: currentDateStr }
-            : apt,
-        )
-        setAppointments(updatedAppointments)
+        const newStartTime = decimalToTimeString(time)
 
-        // Persist change to the backend
-        fetch(`/api/appointments/${draggedAppointment.id}`, {
+        // Persist change to the backend and get the updated appointment
+        const response = await fetch(`/api/appointments/${draggedAppointment.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -590,6 +584,19 @@ export default function ScheduleClient({
             appointment_date: currentDateStr,
           }),
         })
+
+        if (response.ok) {
+          const updatedAppointmentResult = await response.json()
+          const updatedAppointment = updatedAppointmentResult[0]
+
+          // The API returns an enriched object, so we can just use it
+          setAppointments(
+            appointments.map((apt) => (apt.id === draggedAppointment.id ? updatedAppointment : apt)),
+          )
+        } else {
+          // If the API call fails, we don't update the UI
+          console.error("Failed to move appointment")
+        }
       }
 
       setDraggedAppointment(null)
@@ -1215,7 +1222,7 @@ export default function ScheduleClient({
                                 {slotAppointments.map((appointment) => (
                                   <div
                                     key={appointment.id}
-                                    className={`absolute inset-1 rounded-lg p-2 border shadow-sm ${getStatusColor(
+                                    className={`absolute inset-1 rounded-lg p-2 border shadow-sm overflow-hidden ${getStatusColor(
                                       appointment.status,
                                     )} group cursor-move hover:shadow-md transition-all z-10 ${
                                       isDraggingAppointment && draggedAppointment?.id === appointment.id
@@ -1223,7 +1230,7 @@ export default function ScheduleClient({
                                         : ""
                                     }`}
                                     style={{
-                                      height: `${((appointment.duration || 60) / 60) * 120 - 8}px`,
+                                      height: `calc(${((appointment.duration || 60) / 15) * 30}px - 8px)`,
                                     }}
                                     draggable={true}
                                     onDragStart={(e) => handleAppointmentDragStart(appointment, e)}
