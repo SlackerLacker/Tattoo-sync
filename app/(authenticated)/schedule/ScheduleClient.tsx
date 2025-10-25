@@ -1248,6 +1248,7 @@ export default function ScheduleClient({
                                     draggable={true}
                                     onDragStart={(e) => handleAppointmentDragStart(appointment, e)}
                                     onDragEnd={handleAppointmentDragEnd}
+                                    onMouseDown={(e) => e.stopPropagation()} // Prevent clash with new appointment drag
                                     onClick={(e) => {
                                       e.stopPropagation()
                                       openViewDialog(appointment)
