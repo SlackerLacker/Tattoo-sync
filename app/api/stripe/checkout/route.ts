@@ -2,12 +2,10 @@
 import { NextResponse } from "next/server"
 import { stripe } from "@/lib/stripe"
 import { createServerSupabase } from "@/lib/supabase/server-client"
-import { cookies } from "next/headers"
 
 export async function POST(request: Request) {
   try {
-    const cookieStore = cookies()
-    const supabase = createServerSupabase(cookieStore)
+    const supabase = createServerSupabase()
     const {
       data: { user },
     } = await supabase.auth.getUser()
