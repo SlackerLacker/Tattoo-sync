@@ -1,4 +1,4 @@
-import { createServerSupabase } from '@/lib/supabase-server'
+import { createServerSupabase } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { AppSidebar } from '@/components/app-sidebar'
 import { Toaster } from '@/components/ui/sonner'
@@ -8,7 +8,7 @@ export default async function ProtectedLayout({
 }: {
   children: React.ReactNode
 }) {
-  const supabase = await createServerSupabase()
+  const supabase = createServerSupabase()
   const {
     data: { user },
   } = await supabase.auth.getUser()
