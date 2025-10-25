@@ -51,6 +51,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Artist, Service, Client, Appointment } from "@/types"
 import { Switch } from "@/components/ui/switch"
 import { toast } from "sonner"
+import { loadStripe } from "@stripe/stripe-js"
 
 // Shop settings (would normally come from settings page/API)
 const shopSettings = {
@@ -831,13 +832,27 @@ export default function ScheduleClient({
     }
   }
 
-  const handleStripeCheckout = (amount: number) => {
-    // TODO: Integrate with Stripe
-    console.log("Redirecting to Stripe checkout for $", amount)
-    // For now, simulate successful payment
-    setTimeout(() => {
-      completePayment("card", amount, 0)
-    }, 2000)
+  const handleStripeCheckout = async (amount: number) => {
+    try {
+      const response = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ appointment: selectedAppointment }),
+      })
+
+      const session = await response.json()
+
+      const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
+      const stripe = await stripePromise
+      if (stripe) {
+        await stripe.redirectToCheckout({ sessionId: session.id })
+      }
+    } catch (error) {
+      console.error("Error redirecting to Stripe checkout:", error)
+      toast.error("Could not connect to payment provider.")
+    }
   }
 
   const handleCashAppPayment = (amount: number) => {
