@@ -103,6 +103,11 @@ interface DragSelection {
   currentTime: number | null
 }
 
+interface DropTarget {
+  artistId: string
+  time: number
+}
+
 interface ScheduleClientProps {
   serverArtists: Artist[]
   serverServices: Service[]
@@ -172,6 +177,7 @@ export default function ScheduleClient({
   // Add after the existing dragSelection state
   const [draggedAppointment, setDraggedAppointment] = useState<Appointment | null>(null)
   const [isDraggingAppointment, setIsDraggingAppointment] = useState(false)
+  const [dropTarget, setDropTarget] = useState<DropTarget | null>(null)
 
   // Get day of week for current date
   const getDayOfWeek = (date: Date) => {
@@ -386,7 +392,10 @@ export default function ScheduleClient({
     }
   }
 
-  const getSlotBackgroundColor = (status: string, isDragSelected = false) => {
+  const getSlotBackgroundColor = (status: string, isDragSelected = false, isDropTarget = false) => {
+    if (isDropTarget) {
+      return "bg-blue-200 border-blue-300"
+    }
     if (isDragSelected) {
       return "bg-blue-200 border-blue-400"
     }
@@ -530,17 +539,23 @@ export default function ScheduleClient({
   const handleAppointmentDragEnd = useCallback(() => {
     setDraggedAppointment(null)
     setIsDraggingAppointment(false)
+    setDropTarget(null)
   }, [])
 
   const handleSlotDragOver = useCallback(
-    (event: React.DragEvent) => {
+    (artistId: string, time: number, event: React.DragEvent) => {
       if (isDraggingAppointment) {
         event.preventDefault()
         event.dataTransfer.dropEffect = "move"
+        setDropTarget({ artistId, time })
       }
     },
     [isDraggingAppointment],
   )
+
+  const handleSlotDragLeave = useCallback(() => {
+    setDropTarget(null)
+  }, [])
 
   const handleSlotDrop = useCallback(
     async (artistId: string, time: number, event: React.DragEvent) => {
@@ -614,6 +629,7 @@ export default function ScheduleClient({
 
       setDraggedAppointment(null)
       setIsDraggingAppointment(false)
+      setDropTarget(null)
     },
     [draggedAppointment, isDraggingAppointment, appointments, currentDate],
   )
@@ -627,6 +643,18 @@ export default function ScheduleClient({
     const end = Math.max(dragSelection.startTime, dragSelection.currentTime)
 
     return time >= start && time <= end
+  }
+
+  const isDropTarget = (artistId: string, time: number) => {
+    if (!dropTarget || !draggedAppointment || dropTarget.artistId !== artistId) {
+      return false
+    }
+
+    const durationInHours = (draggedAppointment.duration || 60) / 60
+    const startTime = dropTarget.time
+    const endTime = startTime + durationInHours
+
+    return time >= startTime && time < endTime
   }
 
   const handleSlotClick = (artistId: string, time: number) => {
@@ -1162,6 +1190,7 @@ export default function ScheduleClient({
                             const slotStatus = getSlotStatus(artist.id, time)
                             const available = slotStatus === "available"
                             const isDragSelected = isInDragSelection(artist.id, time)
+                            const isTarget = isDropTarget(artist.id, time)
 
                             return (
                               <div
@@ -1169,10 +1198,11 @@ export default function ScheduleClient({
                                 className={`border-b last:border-b-0 p-1 transition-all cursor-pointer relative group ${getSlotBackgroundColor(
                                   slotStatus,
                                   isDragSelected,
+                                  isTarget,
                                 )} ${available ? "hover:bg-green-100" : ""} ${
                                   isDragSelected ? "border-2 border-blue-400" : ""
                                 } ${
-                                  isDraggingAppointment && available
+                                  isDraggingAppointment && available && !isTarget
                                     ? "hover:bg-blue-100 hover:border-2 hover:border-blue-300"
                                     : ""
                                 }`}
@@ -1183,7 +1213,8 @@ export default function ScheduleClient({
                                 }
                                 onMouseDown={(e) => !isDraggingAppointment && handleMouseDown(artist.id, time, e)}
                                 onMouseEnter={() => !isDraggingAppointment && handleMouseEnter(artist.id, time)}
-                                onDragOver={handleSlotDragOver}
+                                onDragOver={(e) => handleSlotDragOver(artist.id, time, e)}
+                                onDragLeave={handleSlotDragLeave}
                                 onDrop={(e) => handleSlotDrop(artist.id, time, e)}
                               >
                                 {/* Time indicator for all time marks - show on hover */}
