@@ -21,11 +21,10 @@ export async function GET(request: Request, { params }: { params: { id: string }
 export async function PUT(request: Request, { params }: { params: { id: string } }) {
   const cookieStore = await cookies()
   const supabase = createServerSupabase(cookieStore)
-  const { id } = params
   const { data: appointment, error } = await supabase
     .from("appointments")
     .update(await request.json())
-    .eq("id", id)
+    .eq("id", params.id)
     .select("*, clients:clients(*), artists:artists(*), services:services(*)")
 
   if (error) {
