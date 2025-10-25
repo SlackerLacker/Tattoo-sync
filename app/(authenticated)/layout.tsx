@@ -1,22 +1,21 @@
-import { createServerSupabase } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
-import { AppSidebar } from '@/components/app-sidebar'
-import { cookies } from "next/headers"
-import { Toaster } from '@/components/ui/sonner'
+
+import { createServerSupabase } from "@/lib/supabase/server"
+import { redirect } from "next/navigation"
+import { AppSidebar } from "@/components/app-sidebar"
+import { Toaster } from "@/components/ui/sonner"
 
 export default async function ProtectedLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const cookieStore = cookies()
-  const supabase = createServerSupabase(cookieStore)
+  const supabase = createServerSupabase()
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
   if (!user) {
-    redirect('/login')
+    redirect("/login")
   }
 
   return (
@@ -29,4 +28,3 @@ export default async function ProtectedLayout({
     </div>
   )
 }
-
