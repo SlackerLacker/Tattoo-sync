@@ -1,6 +1,7 @@
 import { createServerSupabase } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { AppSidebar } from '@/components/app-sidebar'
+import { cookies } from "next/headers"
 import { Toaster } from '@/components/ui/sonner'
 
 export default async function ProtectedLayout({
@@ -8,7 +9,8 @@ export default async function ProtectedLayout({
 }: {
   children: React.ReactNode
 }) {
-  const supabase = createServerSupabase()
+  const cookieStore = cookies()
+  const supabase = createServerSupabase(cookieStore)
   const {
     data: { user },
   } = await supabase.auth.getUser()
