@@ -1,11 +1,9 @@
-import { createServerSupabase } from "@/lib/supabase/server-client"
-import { cookies } from "next/headers"
+import { createServerSupabase } from "@/lib/supabase/server"
 import ScheduleClient from "./ScheduleClient"
 import { Artist, Service, Client, Appointment } from "@/types"
 
 export default async function SchedulePage() {
-  const cookieStore = await cookies()
-  const supabase = createServerSupabase(cookieStore)
+  const supabase = createServerSupabase()
 
   const { data: artists } = await supabase.from("artists").select("*")
   const { data: services } = await supabase.from("services").select("*")
