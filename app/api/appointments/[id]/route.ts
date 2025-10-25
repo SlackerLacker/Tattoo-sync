@@ -1,10 +1,8 @@
 import { createServerSupabase } from "@/lib/supabase/server-client"
-import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 
 export async function GET(request: Request, { params }: { params: { id: string } }) {
-  const cookieStore = await cookies()
-  const supabase = createServerSupabase(cookieStore)
+  const supabase = createServerSupabase()
   const { data: appointment, error } = await supabase
     .from("appointments")
     .select("*, clients:clients(*), artists:artists(*), services:services(*)")
@@ -19,8 +17,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
 }
 
 export async function PUT(request: Request, { params }: { params: { id: string } }) {
-  const cookieStore = cookies()
-  const supabase = createServerSupabase(cookieStore)
+  const supabase = createServerSupabase()
   const { data: appointment, error } = await supabase
     .from("appointments")
     .update(await request.json())
@@ -35,8 +32,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
 }
 
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
-  const cookieStore = await cookies()
-  const supabase = createServerSupabase(cookieStore)
+  const supabase = createServerSupabase()
   const { data: appointment, error } = await supabase.from("appointments").delete().eq("id", params.id)
 
   if (error) {
