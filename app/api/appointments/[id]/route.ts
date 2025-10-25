@@ -19,7 +19,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
 }
 
 export async function PUT(request: Request, { params }: { params: { id: string } }) {
-  const cookieStore = await cookies()
+  const cookieStore = cookies()
   const supabase = createServerSupabase(cookieStore)
   const { data: appointment, error } = await supabase
     .from("appointments")
