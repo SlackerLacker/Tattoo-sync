@@ -50,6 +50,7 @@ import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Artist, Service, Client, Appointment } from "@/types"
 import { Switch } from "@/components/ui/switch"
+import { toast } from "sonner"
 
 // Shop settings (would normally come from settings page/API)
 const shopSettings = {
@@ -621,6 +622,7 @@ export default function ScheduleClient({
           setAppointments((prevAppointments) =>
             prevAppointments.map((apt) => (apt.id === draggedAppointment.id ? enrichedAppointment : apt)),
           )
+          toast.success("Appointment updated!")
         } else {
           // If the API call fails, we don't update the UI
           console.error("Failed to move appointment")
@@ -758,6 +760,7 @@ export default function ScheduleClient({
       setAppointments([...appointments, enrichedAppointment])
       setIsNewAppointmentDialogOpen(false)
       resetForm()
+      toast.success("Appointment created!")
     } else {
       const { error } = await appointmentResponse.json()
       setFormError(`Failed to create appointment: ${error}`)
@@ -781,6 +784,7 @@ export default function ScheduleClient({
       )
       setIsEditDialogOpen(false)
       resetForm()
+      toast.success("Appointment updated!")
     } else {
       // Handle error
       console.error("Failed to update appointment")
