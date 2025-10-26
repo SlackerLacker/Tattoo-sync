@@ -40,12 +40,16 @@ export async function POST(request: Request) {
       },
     ]
 
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL
+    // Ensure the URL has a protocol, defaulting to https if missing.
+    const baseUrl = appUrl?.startsWith("http") ? appUrl : `https://${appUrl}`
+
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       line_items: lineItems,
       mode: "payment",
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/schedule?payment_status=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/schedule?payment_status=cancelled`,
+      success_url: `${baseUrl}/schedule?payment_status=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}/schedule?payment_status=cancelled`,
       metadata: {
         appointmentId: appointment.id,
       },
