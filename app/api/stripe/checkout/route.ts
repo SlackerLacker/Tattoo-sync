@@ -55,7 +55,7 @@ export async function POST(request: Request) {
       },
     })
 
-    return NextResponse.json({ id: session.id })
+    return NextResponse.json(session)
   } catch (error) {
     console.error("[STRIPE_CHECKOUT_ERROR] An unexpected error occurred:", error)
     return new NextResponse("Internal Server Error", { status: 500 })

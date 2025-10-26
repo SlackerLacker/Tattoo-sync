@@ -859,16 +859,12 @@ export default function ScheduleClient({
         return
       }
 
-      const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
-      const stripe = await stripePromise
-
-      if (stripe) {
-        const { error } = await stripe.redirectToCheckout({ sessionId: session.id })
-        if (error) {
-          toast.error(`Payment redirect failed: ${error.message}`)
-        }
+      // The session object now contains a `url` property.
+      // We will use this to redirect the user to the Stripe checkout page.
+      if (session.url) {
+        window.location.href = session.url
       } else {
-        toast.error("Payment provider is not available. Please try again.")
+        toast.error("Could not get checkout URL. Please try again.")
       }
     } catch (error) {
       console.error("Error during Stripe checkout process:", error)
