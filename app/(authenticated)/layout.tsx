@@ -1,5 +1,5 @@
 
-import { createServerSupabase } from "@/lib/supabase/server"
+import { createServerSupabase } from "@/lib/supabase-server"
 import { redirect } from "next/navigation"
 import { AppSidebar } from "@/components/app-sidebar"
 import { Toaster } from "@/components/ui/sonner"

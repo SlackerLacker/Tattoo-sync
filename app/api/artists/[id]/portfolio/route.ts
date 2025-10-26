@@ -1,10 +1,8 @@
-import { createServerSupabase } from "@/lib/supabase/server-client"
-import { cookies } from "next/headers"
+import { createServerSupabase } from "@/lib/supabase-server"
 import { NextResponse } from "next/server"
 
 export async function POST(request: Request) {
-  const cookieStore = await cookies()
-  const supabase = createServerSupabase(cookieStore)
+  const supabase = createServerSupabase()
   const artistId = request.url.split("/").slice(-2, -1)[0] // Get the [id] from the URL
 
   try {
