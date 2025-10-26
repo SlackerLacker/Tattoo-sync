@@ -48,7 +48,7 @@ export async function POST(request: Request) {
       payment_method_types: ["card"],
       line_items: lineItems,
       mode: "payment",
-      success_url: `${baseUrl}/schedule?payment_status=success&session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${baseUrl}/schedule/payment-success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${baseUrl}/schedule?payment_status=cancelled`,
       metadata: {
         appointmentId: appointment.id,
