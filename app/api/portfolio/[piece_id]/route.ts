@@ -1,10 +1,8 @@
-import { createServerSupabase } from "@/lib/supabase/server-client"
-import { cookies } from "next/headers"
+import { createServerSupabase } from "@/lib/supabase-server"
 import { NextResponse } from "next/server"
 
 export async function PATCH(request: Request, { params }: { params: { piece_id: string } }) {
-  const cookieStore = await cookies()
-  const supabase = createServerSupabase(cookieStore)
+  const supabase = createServerSupabase()
   const pieceId = params.piece_id
 
   if (!pieceId) {
@@ -36,8 +34,7 @@ export async function PATCH(request: Request, { params }: { params: { piece_id: 
 }
 
 export async function PUT(request: Request, { params }: { params: { piece_id: string } }) {
-  const cookieStore = await cookies()
-  const supabase = createServerSupabase(cookieStore)
+  const supabase = createServerSupabase()
   const pieceId = params.piece_id
 
   if (!pieceId) {
@@ -65,8 +62,7 @@ export async function PUT(request: Request, { params }: { params: { piece_id: st
 }
 
 export async function DELETE(request: Request, { params }: { params: { piece_id: string } }) {
-  const cookieStore = await cookies()
-  const supabase = createServerSupabase(cookieStore)
+  const supabase = createServerSupabase()
   const pieceId = params.piece_id
 
   if (!pieceId) {

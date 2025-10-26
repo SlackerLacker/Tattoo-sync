@@ -833,17 +833,12 @@ export default function ScheduleClient({
   }
 
   const handleStripeCheckout = async (amount: number) => {
-    console.log("Initiating Stripe checkout for amount:", amount)
-    console.log("Selected appointment for checkout:", selectedAppointment)
-
     if (!selectedAppointment) {
       toast.error("No appointment selected for checkout.")
-      console.error("handleStripeCheckout called without a selected appointment.")
       return
     }
 
     try {
-      console.log("Sending request to /api/stripe/checkout")
       const response = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: {
@@ -851,20 +846,15 @@ export default function ScheduleClient({
         },
         body: JSON.stringify({ appointment: selectedAppointment }),
       })
-      console.log("Received response from /api/stripe/checkout:", response)
 
       if (!response.ok) {
-        const errorBody = await response.text()
-        console.error("Stripe checkout API request failed:", response.status, errorBody)
         toast.error(`Payment API error: ${response.statusText}`)
         return
       }
 
       const session = await response.json()
-      console.log("Received Stripe session:", session)
 
       if (!session || !session.id) {
-        console.error("Invalid session received from backend:", session)
         toast.error("Failed to create a valid payment session.")
         return
       }
@@ -873,14 +863,11 @@ export default function ScheduleClient({
       const stripe = await stripePromise
 
       if (stripe) {
-        console.log("Redirecting to Stripe checkout with session ID:", session.id)
         const { error } = await stripe.redirectToCheckout({ sessionId: session.id })
         if (error) {
-          console.error("Stripe redirectToCheckout error:", error)
           toast.error(`Payment redirect failed: ${error.message}`)
         }
       } else {
-        console.error("Stripe.js has not loaded yet.")
         toast.error("Payment provider is not available. Please try again.")
       }
     } catch (error) {
