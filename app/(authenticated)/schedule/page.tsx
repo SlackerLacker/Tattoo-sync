@@ -1,5 +1,5 @@
 
-import { createServerSupabase } from "@/lib/supabase/server"
+import { createServerSupabase } from "@/lib/supabase-server"
 import ScheduleClient from "./ScheduleClient"
 import { Artist, Service, Client, Appointment } from "@/types"
 
