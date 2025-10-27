@@ -1348,7 +1348,7 @@ export default function ScheduleClient({
           </Card>
 
           {/* Summary Stats */}
-          <div className="grid gap-4 md:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-3">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Appointments ({stats.title})</CardTitle>
@@ -1381,7 +1381,7 @@ export default function ScheduleClient({
       ) : (
         <>
           {/* Stats Cards for List View */}
-          <div className="grid gap-4 md:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-3">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Appointments ({stats.title})</CardTitle>
@@ -1954,8 +1954,7 @@ export default function ScheduleClient({
           <AlertDialogHeader>
             <AlertDialogTitle>Cancel Appointment</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to cancel this appointment with {selectedAppointment?.clients?.full_name}? This
-              action cannot be undone.
+              Are you sure you want to cancel this appointment? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1965,7 +1964,7 @@ export default function ScheduleClient({
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
-      </Dialog>
+      </AlertDialog>
 
       {/* Checkout Dialog */}
       <Dialog open={isCheckoutDialogOpen} onOpenChange={setIsCheckoutDialogOpen}>
