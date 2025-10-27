@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { supabase } from "@/lib/supabase-browser"
 import ConnectStripe from "@/components/stripe/ConnectStripe"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -53,7 +53,6 @@ const users = [
 ]
 
 export default function SettingsPage() {
-  const supabase = createClientComponentClient()
   const [studio, setStudio] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
@@ -159,7 +158,7 @@ export default function SettingsPage() {
     }
 
     fetchStudio()
-  }, [supabase])
+  }, [])
 
   const handleSave = () => {
     console.log("Saving settings...")
