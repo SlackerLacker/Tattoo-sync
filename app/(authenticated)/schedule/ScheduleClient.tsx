@@ -259,10 +259,15 @@ export default function ScheduleClient({
 
   // Get appointments that START in this specific time slot
   const getAppointmentsStartingInSlot = (artistId: string, time: number) => {
-    const currentDateStr = currentDate.toISOString().split("T")[0]
     return appointments.filter((apt) => {
+      const aptDate = new Date(apt.appointment_date)
+      const isSameDay =
+        aptDate.getFullYear() === currentDate.getFullYear() &&
+        aptDate.getMonth() === currentDate.getMonth() &&
+        aptDate.getDate() === currentDate.getDate()
+
       const aptStartTime = timeToDecimal(apt.start_time)
-      return apt.artist_id === artistId && apt.appointment_date === currentDateStr && aptStartTime === time
+      return apt.artist_id === artistId && isSameDay && aptStartTime === time
     })
   }
 
@@ -272,11 +277,17 @@ export default function ScheduleClient({
     if (!isShopOpen(time, currentDate) || !isArtistAvailable(artistId, time, currentDate)) return false
 
     const hasAppointment = appointments.some((apt) => {
+      const aptDate = new a.date(apt.appointment_date)
+      const isSameDay =
+        aptDate.getFullYear() === currentDate.getFullYear() &&
+        aptDate.getMonth() === currentDate.getMonth() &&
+        aptDate.getDate() === currentDate.getDate()
+
       const aptStartTime = timeToDecimal(apt.start_time)
       const aptDuration = (apt.duration || 60) / 60 // default to 1 hour
       return (
         apt.artist_id === artistId &&
-        apt.appointment_date === currentDateStr &&
+        isSameDay &&
         time >= aptStartTime &&
         time < aptStartTime + aptDuration
       )
@@ -289,11 +300,17 @@ export default function ScheduleClient({
     const currentDateStr = currentDate.toISOString().split("T")[0]
 
     const appointment = appointments.find((apt) => {
+      const aptDate = new Date(apt.appointment_date)
+      const isSameDay =
+        aptDate.getFullYear() === currentDate.getFullYear() &&
+        aptDate.getMonth() === currentDate.getMonth() &&
+        aptDate.getDate() === currentDate.getDate()
+
       const aptStartTime = timeToDecimal(apt.start_time)
       const aptDuration = (apt.duration || 60) / 60
       return (
         apt.artist_id === artistId &&
-        apt.appointment_date === currentDateStr &&
+        isSameDay &&
         time >= aptStartTime &&
         time < aptStartTime + aptDuration
       )
@@ -540,12 +557,21 @@ export default function ScheduleClient({
           return false
         }
         const hasConflict = appointments.some(
-          (apt) =>
-            apt.id !== draggedAppointment.id &&
-            apt.artist_id === artistId &&
-            apt.appointment_date === currentDateStr &&
-            slot >= timeToDecimal(apt.start_time) &&
-            slot < timeToDecimal(apt.start_time) + (apt.duration || 60) / 60,
+          (apt) => {
+            const aptDate = new Date(apt.appointment_date)
+            const isSameDay =
+              aptDate.getFullYear() === currentDate.getFullYear() &&
+              aptDate.getMonth() === currentDate.getMonth() &&
+              aptDate.getDate() === currentDate.getDate()
+
+            return (
+              apt.id !== draggedAppointment.id &&
+              apt.artist_id === artistId &&
+              isSameDay &&
+              slot >= timeToDecimal(apt.start_time) &&
+              slot < timeToDecimal(apt.start_time) + (apt.duration || 60) / 60
+            )
+          }
         )
         return !hasConflict
       })
@@ -1954,7 +1980,8 @@ export default function ScheduleClient({
           <AlertDialogHeader>
             <AlertDialogTitle>Cancel Appointment</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to cancel this appointment? This action cannot be undone.
+              Are you sure you want to cancel this appointment with {selectedAppointment?.clients?.full_name}? This
+              action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
