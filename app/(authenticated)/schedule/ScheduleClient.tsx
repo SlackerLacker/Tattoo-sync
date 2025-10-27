@@ -416,16 +416,32 @@ export default function ScheduleClient({
 
   const getStats = () => {
     const today = new Date()
-    const upcoming = appointments.filter(
-      (apt) => new Date(apt.appointment_date) >= today && apt.status !== "cancelled",
-    )
-    const confirmed = appointments.filter((apt) => apt.status === "confirmed")
-    const pending = appointments.filter((apt) => apt.status === "pending")
-    const totalRevenue = appointments
-      .filter((apt) => apt.status === "completed")
-      .reduce((sum, apt) => sum + (apt.price || 0), 0)
+    const todayStr = today.toISOString().split("T")[0]
 
-    return { upcoming: upcoming.length, confirmed: confirmed.length, pending: pending.length, totalRevenue }
+    const todaysAppointments = appointments.filter(
+      (apt) => apt.appointment_date === todayStr && apt.status !== "cancelled",
+    )
+
+    const todaysRevenue = todaysAppointments.reduce((sum, apt) => {
+      if (apt.payment_status === "paid" || apt.status === "completed") {
+        return sum + (apt.price || 0)
+      }
+      return sum
+    }, 0)
+
+    const totalBookedHours = todaysAppointments.reduce((sum, apt) => sum + (apt.duration || 0), 0) / 60
+
+    const upcomingAppointments = appointments.filter((apt) => {
+      const aptDate = new Date(apt.appointment_date)
+      return aptDate >= today && apt.status !== "cancelled"
+    })
+
+    return {
+      todaysAppointments: todaysAppointments.length,
+      todaysRevenue,
+      totalBookedHours: totalBookedHours.toFixed(1),
+      upcomingAppointments: upcomingAppointments.length,
+    }
   }
 
   const stats = getStats()
@@ -1326,32 +1342,47 @@ export default function ScheduleClient({
           </Card>
 
           {/* Summary Stats */}
-          <div className="grid grid-cols-4 gap-4">
-            {artists.map((artist) => {
-              const currentDateStr = currentDate.toISOString().split("T")[0]
-              const artistAppointments = appointments.filter(
-                (apt) => apt.artist_id == artist.id && apt.appointment_date === currentDateStr,
-              )
-              const totalMinutes = artistAppointments.reduce((sum, apt) => sum + (apt.duration || 0), 0)
-              const totalHours = totalMinutes / 60
-              const totalRevenue = artistAppointments.reduce((sum, apt) => sum + (apt.price || 0), 0)
-
-              return (
-                <Card key={artist.id}>
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className={`w-3 h-3 rounded-full bg-blue-500`}></div>
-                      <span className="font-medium text-sm">{artist.name}</span>
-                    </div>
-                    <div className="space-y-1 text-xs text-gray-600">
-                      <div>{artistAppointments.length} appointments</div>
-                      <div>{totalHours.toFixed(1)} hours booked</div>
-                      <div>${totalRevenue} revenue</div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )
-            })}
+          <div className="grid gap-4 md:grid-cols-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Today&apos;s Appointments</CardTitle>
+                <CalendarDays className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.todaysAppointments}</div>
+                <p className="text-xs text-muted-foreground">Total appointments scheduled for today</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Today&apos;s Revenue</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">${stats.todaysRevenue.toLocaleString()}</div>
+                <p className="text-xs text-muted-foreground">Based on completed or paid appointments</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Booked Hours (Today)</CardTitle>
+                <Clock className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.totalBookedHours}</div>
+                <p className="text-xs text-muted-foreground">Total hours booked across all artists</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Upcoming Appointments</CardTitle>
+                <CheckCircle className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.upcomingAppointments}</div>
+                <p className="text-xs text-muted-foreground">All upcoming, non-cancelled appointments</p>
+              </CardContent>
+            </Card>
           </div>
         </>
       ) : (
@@ -1359,39 +1390,43 @@ export default function ScheduleClient({
           {/* Stats Cards for List View */}
           <div className="grid gap-4 md:grid-cols-4">
             <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2">
-                  <CalendarDays className="h-4 w-4 text-blue-600" />
-                  <span className="text-sm font-medium">Upcoming</span>
-                </div>
-                <p className="text-2xl font-bold mt-2">{stats.upcoming}</p>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Today&apos;s Appointments</CardTitle>
+                <CalendarDays className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.todaysAppointments}</div>
+                <p className="text-xs text-muted-foreground">Total appointments scheduled for today</p>
               </CardContent>
             </Card>
             <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-green-600" />
-                  <span className="text-sm font-medium">Confirmed</span>
-                </div>
-                <p className="text-2xl font-bold mt-2">{stats.confirmed}</p>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Today&apos;s Revenue</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">${stats.todaysRevenue.toLocaleString()}</div>
+                <p className="text-xs text-muted-foreground">Based on completed or paid appointments</p>
               </CardContent>
             </Card>
             <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4 text-yellow-600" />
-                  <span className="text-sm font-medium">Pending</span>
-                </div>
-                <p className="text-2xl font-bold mt-2">{stats.pending}</p>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Booked Hours (Today)</CardTitle>
+                <Clock className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.totalBookedHours}</div>
+                <p className="text-xs text-muted-foreground">Total hours booked across all artists</p>
               </CardContent>
             </Card>
             <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2">
-                  <DollarSign className="h-4 w-4 text-green-600" />
-                  <span className="text-sm font-medium">Revenue (Completed)</span>
-                </div>
-                <p className="text-2xl font-bold mt-2">${stats.totalRevenue.toLocaleString()}</p>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Upcoming Appointments</CardTitle>
+                <CheckCircle className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.upcomingAppointments}</div>
+                <p className="text-xs text-muted-foreground">All upcoming, non-cancelled appointments</p>
               </CardContent>
             </Card>
           </div>
