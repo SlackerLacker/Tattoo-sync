@@ -414,74 +414,6 @@ export default function ScheduleClient({
     return artists.find((artist) => artist.id === id)
   }
 
-  // const getStats = () => {
-  //   const today = new Date()
-  //   const todayStr = today.toISOString().split("T")[0]
-
-  //   const todaysAppointments = appointments.filter(
-  //     (apt) => apt.appointment_date === todayStr && apt.status !== "cancelled",
-  //   )
-
-  //   const todaysRevenue = todaysAppointments.reduce((sum, apt) => {
-  //     if (apt.payment_status === "paid" || apt.status === "completed") {
-  //       return sum + (apt.price || 0)
-  //     }
-  //     return sum
-  //   }, 0)
-
-  //   const totalBookedHours = todaysAppointments.reduce((sum, apt) => sum + (apt.duration || 0), 0) / 60
-
-  //   const upcomingAppointments = appointments.filter((apt) => {
-  //     const aptDate = new Date(apt.appointment_date)
-  //     return aptDate >= today && apt.status !== "cancelled"
-  //   })
-
-  //   return {
-  //     todaysAppointments: todaysAppointments.length,
-  //     todaysRevenue,
-  //     totalBookedHours: totalBookedHours.toFixed(1),
-  //     upcomingAppointments: upcomingAppointments.length,
-  //   }
-  // }
-
-  const stats = useMemo(() => {
-    const data = viewMode === "calendar" ? appointments : filteredAppointments
-    const title =
-      viewMode === "calendar"
-        ? isToday(currentDate)
-          ? "Today"
-          : formatDate(currentDate.toISOString())
-        : "Filtered List"
-
-    const appointmentsForDate =
-      viewMode === "calendar"
-        ? data.filter((apt) => {
-            const aptDate = new Date(apt.appointment_date)
-            return (
-              aptDate.getFullYear() === currentDate.getFullYear() &&
-              aptDate.getMonth() === currentDate.getMonth() &&
-              aptDate.getDate() === currentDate.getDate()
-            )
-          })
-        : data
-
-    const revenue = appointmentsForDate.reduce((sum, apt) => {
-      if (apt.payment_status === "paid" || apt.status === "completed") {
-        return sum + (apt.price || 0)
-      }
-      return sum
-    }, 0)
-
-    const totalBookedHours = appointmentsForDate.reduce((sum, apt) => sum + (apt.duration || 0), 0) / 60
-
-    return {
-      title,
-      appointments: appointmentsForDate.length,
-      revenue,
-      bookedHours: totalBookedHours.toFixed(1),
-    }
-  }, [viewMode, appointments, filteredAppointments, currentDate])
-
   const calculatePrice = (artistId: any | null | undefined, duration: number | null | undefined) => {
     const artist = getArtistById(artistId)
     if (!artist || !duration) return 0
@@ -1055,6 +987,44 @@ export default function ScheduleClient({
 
     return filtered
   }, [appointments, searchTerm, statusFilter, artistFilter, dateFilter])
+
+  const stats = useMemo(() => {
+    const data = viewMode === "calendar" ? appointments : filteredAppointments
+    const title =
+      viewMode === "calendar"
+        ? isToday(currentDate)
+          ? "Today"
+          : formatDate(currentDate.toISOString())
+        : "Filtered List"
+
+    const appointmentsForDate =
+      viewMode === "calendar"
+        ? data.filter((apt) => {
+            const aptDate = new Date(apt.appointment_date)
+            return (
+              aptDate.getFullYear() === currentDate.getFullYear() &&
+              aptDate.getMonth() === currentDate.getMonth() &&
+              aptDate.getDate() === currentDate.getDate()
+            )
+          })
+        : data
+
+    const revenue = appointmentsForDate.reduce((sum, apt) => {
+      if (apt.payment_status === "paid" || apt.status === "completed") {
+        return sum + (apt.price || 0)
+      }
+      return sum
+    }, 0)
+
+    const totalBookedHours = appointmentsForDate.reduce((sum, apt) => sum + (apt.duration || 0), 0) / 60
+
+    return {
+      title,
+      appointments: appointmentsForDate.length,
+      revenue,
+      bookedHours: totalBookedHours.toFixed(1),
+    }
+  }, [viewMode, appointments, filteredAppointments, currentDate])
 
   return (
     <div className="flex flex-1 flex-col gap-4" onMouseUp={handleMouseUp}>
@@ -1995,7 +1965,7 @@ export default function ScheduleClient({
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
-      </AlertDialog>
+      </Dialog>
 
       {/* Checkout Dialog */}
       <Dialog open={isCheckoutDialogOpen} onOpenChange={setIsCheckoutDialogOpen}>
