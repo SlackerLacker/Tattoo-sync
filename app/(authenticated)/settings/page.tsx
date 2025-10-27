@@ -1,6 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import ConnectStripe from "@/components/stripe/ConnectStripe"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -51,6 +53,10 @@ const users = [
 ]
 
 export default function SettingsPage() {
+  const supabase = createClientComponentClient()
+  const [studio, setStudio] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
   const [activeTab, setActiveTab] = useState("shop")
   const [shopSettings, setShopSettings] = useState({
     name: "Ink Studio Tattoo",
@@ -107,8 +113,6 @@ export default function SettingsPage() {
     acceptCashApp: true,
     acceptPayPal: false,
     stripeEnabled: true,
-    stripePublishableKey: "pk_test_...",
-    stripeSecretKey: "sk_test_...",
     processingFee: 2.9,
     cancellationFee: 25,
     lateFee: 10,
@@ -137,11 +141,29 @@ export default function SettingsPage() {
 
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
 
+  useEffect(() => {
+    const fetchStudio = async () => {
+      setLoading(true)
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (user) {
+        const { data, error } = await supabase.from("studios").select("*").eq("owner_id", user.id).single()
+        if (error) {
+          console.error("Error fetching studio:", error)
+        } else {
+          setStudio(data)
+        }
+      }
+      setLoading(false)
+    }
+
+    fetchStudio()
+  }, [supabase])
+
   const handleSave = () => {
-    // In a real app, this would save to the backend
     console.log("Saving settings...")
     setHasUnsavedChanges(false)
-    // Show success message
     alert("Settings saved successfully!")
   }
 
@@ -186,6 +208,10 @@ export default function SettingsPage() {
 
   const formatDayName = (day: string) => {
     return day.charAt(0).toUpperCase() + day.slice(1)
+  }
+
+  if (loading) {
+    return <div>Loading...</div>
   }
 
   return (
@@ -809,40 +835,11 @@ export default function SettingsPage() {
               <CardTitle>Stripe Configuration</CardTitle>
               <CardDescription>Configure your Stripe payment processing</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Enable Stripe</Label>
-                  <p className="text-sm text-muted-foreground">Process credit card payments through Stripe</p>
-                </div>
-                <Switch
-                  checked={paymentSettings.stripeEnabled}
-                  onCheckedChange={(checked) => handleInputChange("payments", "stripeEnabled", checked)}
-                />
-              </div>
-
-              {paymentSettings.stripeEnabled && (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="stripe-publishable">Publishable Key</Label>
-                    <Input
-                      id="stripe-publishable"
-                      value={paymentSettings.stripePublishableKey}
-                      onChange={(e) => handleInputChange("payments", "stripePublishableKey", e.target.value)}
-                      placeholder="pk_test_..."
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="stripe-secret">Secret Key</Label>
-                    <Input
-                      id="stripe-secret"
-                      type="password"
-                      value={paymentSettings.stripeSecretKey}
-                      onChange={(e) => handleInputChange("payments", "stripeSecretKey", e.target.value)}
-                      placeholder="sk_test_..."
-                    />
-                  </div>
-                </>
+            <CardContent>
+              {studio ? (
+                <ConnectStripe studio={studio} />
+              ) : (
+                <p>Could not load studio information.</p>
               )}
             </CardContent>
           </Card>

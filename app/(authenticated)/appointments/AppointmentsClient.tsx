@@ -21,6 +21,7 @@ import {
   XCircle,
   AlertCircle,
   Eye,
+  CreditCard,
 } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -39,6 +40,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Appointment, Artist, Service, Client } from "@/types"
+import { loadStripe } from "@stripe/stripe-js"
+import { toast } from "sonner"
+
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
 
 interface AppointmentsClientProps {
   appointments: Appointment[]
@@ -62,7 +67,40 @@ export default function AppointmentsClient({
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [isCheckoutDialogOpen, setIsCheckoutDialogOpen] = useState(false)
+  const [tipAmount, setTipAmount] = useState(0)
   const [formData, setFormData] = useState<Partial<Appointment>>({})
+  const [checkoutLoading, setCheckoutLoading] = useState(false)
+
+  const handleCheckout = async () => {
+    if (!selectedAppointment) return
+    setCheckoutLoading(true)
+
+    try {
+      const response = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          appointment_id: selectedAppointment.id,
+          amount: selectedAppointment.price,
+          tip: tipAmount,
+        }),
+      })
+
+      const { sessionId } = await response.json()
+      const stripe = await stripePromise
+      if (stripe) {
+        await stripe.redirectToCheckout({ sessionId })
+      }
+    } catch (error) {
+      console.error(error)
+      toast.error("An unexpected error occurred during checkout.")
+    } finally {
+      setCheckoutLoading(false)
+    }
+  }
 
   const formatTime = (timeString: string | null | undefined) => {
     if (!timeString) return "N/A"
@@ -209,6 +247,11 @@ export default function AppointmentsClient({
   const openDeleteDialog = (appointment: Appointment) => {
     setSelectedAppointment(appointment)
     setIsDeleteDialogOpen(true)
+  }
+
+  const openCheckoutDialog = (appointment: Appointment) => {
+    setSelectedAppointment(appointment)
+    setIsCheckoutDialogOpen(true)
   }
 
   const handleEditAppointment = async () => {
@@ -476,6 +519,12 @@ export default function AppointmentsClient({
                                 <Edit className="mr-2 h-4 w-4" />
                                 Edit
                               </DropdownMenuItem>
+                              {appointment.status === "confirmed" && !isPast && (
+                                <DropdownMenuItem onClick={() => openCheckoutDialog(appointment)}>
+                                  <CreditCard className="mr-2 h-4 w-4" />
+                                  Checkout
+                                </DropdownMenuItem>
+                              )}
                               {appointment.status === "pending" && (
                                 <DropdownMenuItem onClick={() => updateAppointmentStatus(appointment.id, "confirmed")}>
                                   <CheckCircle className="mr-2 h-4 w-4" />
@@ -632,6 +681,53 @@ export default function AppointmentsClient({
                 Edit Appointment
               </Button>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+      {/* Checkout Dialog */}
+      <Dialog open={isCheckoutDialogOpen} onOpenChange={setIsCheckoutDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Checkout</DialogTitle>
+            <DialogDescription>
+              Confirm the payment amount and add an optional tip.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="amount" className="text-right">
+                Amount
+              </Label>
+              <Input
+                id="amount"
+                value={`$${selectedAppointment?.price}`}
+                disabled
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="tip" className="text-right">
+                Tip
+              </Label>
+              <Input
+                id="tip"
+                type="number"
+                value={tipAmount}
+                onChange={(e) => setTipAmount(Number(e.target.value))}
+                className="col-span-3"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setIsCheckoutDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleCheckout} disabled={checkoutLoading}>
+              {checkoutLoading ? "Processing..." : "Proceed to Payment"}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
