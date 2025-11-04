@@ -277,7 +277,10 @@ export default function ScheduleClient({
     if (!isShopOpen(time, currentDate) || !isArtistAvailable(artistId, time, currentDate)) return false
 
     const hasAppointment = appointments.some((apt) => {
-      const aptDate = new a.date(apt.appointment_date)
+      if (draggedAppointment && apt.id === draggedAppointment.id) {
+        return false
+      }
+      const aptDate = new Date(apt.appointment_date)
       const isSameDay =
         aptDate.getFullYear() === currentDate.getFullYear() &&
         aptDate.getMonth() === currentDate.getMonth() &&
@@ -300,6 +303,9 @@ export default function ScheduleClient({
     const currentDateStr = currentDate.toISOString().split("T")[0]
 
     const appointment = appointments.find((apt) => {
+      if (draggedAppointment && apt.id === draggedAppointment.id) {
+        return false
+      }
       const aptDate = new Date(apt.appointment_date)
       const isSameDay =
         aptDate.getFullYear() === currentDate.getFullYear() &&
