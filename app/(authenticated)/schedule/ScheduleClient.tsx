@@ -172,6 +172,7 @@ export default function ScheduleClient({
   // Add after the existing dragSelection state
   const [draggedAppointment, setDraggedAppointment] = useState<Appointment | null>(null)
   const [isDraggingAppointment, setIsDraggingAppointment] = useState(false)
+  const [dragOverSlot, setDragOverSlot] = useState<{ artistId: string; time: number } | null>(null)
 
   // Get day of week for current date
   const getDayOfWeek = (date: Date) => {
@@ -529,16 +530,21 @@ export default function ScheduleClient({
     event.dataTransfer.effectAllowed = "move"
   }, [])
 
+  const handleSlotDragLeave = useCallback(() => {
+    setDragOverSlot(null)
+  }, [])
+
   const handleAppointmentDragEnd = useCallback(() => {
     setDraggedAppointment(null)
     setIsDraggingAppointment(false)
   }, [])
 
   const handleSlotDragOver = useCallback(
-    (event: React.DragEvent) => {
+    (artistId: string, time: number, event: React.DragEvent) => {
       if (isDraggingAppointment) {
         event.preventDefault()
         event.dataTransfer.dropEffect = "move"
+        setDragOverSlot({ artistId, time })
       }
     },
     [isDraggingAppointment],
@@ -1212,7 +1218,8 @@ export default function ScheduleClient({
                                 }
                                 onMouseDown={(e) => !isDraggingAppointment && handleMouseDown(artist.id, time, e)}
                                 onMouseEnter={() => !isDraggingAppointment && handleMouseEnter(artist.id, time)}
-                                onDragOver={handleSlotDragOver}
+                                onDragOver={(e) => handleSlotDragOver(artist.id, time, e)}
+                                onDragLeave={handleSlotDragLeave}
                                 onDrop={(e) => handleSlotDrop(artist.id, time, e)}
                               >
                                 {/* Time indicator for all time marks - show on hover */}
@@ -1221,7 +1228,7 @@ export default function ScheduleClient({
                                 </div>
 
                                 {available && !isDragSelected && (
-                                  <div className="absolute inset-1 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                                  <div className="absolute inset-1 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                                     <Plus className="h-4 w-4 text-green-600" />
                                   </div>
                                 )}
@@ -1255,11 +1262,14 @@ export default function ScheduleClient({
                                 )}
 
                                 {/* Drop zone indicator when dragging */}
-                                {isDraggingAppointment && available && (
-                                  <div className="absolute inset-1 border-2 border-dashed border-blue-400 rounded opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                    <div className="text-xs text-blue-600 font-medium">Drop Here</div>
-                                  </div>
-                                )}
+                                {isDraggingAppointment &&
+                                  available &&
+                                  dragOverSlot?.artistId === artist.id &&
+                                  dragOverSlot?.time === time && (
+                                    <div className="absolute inset-1 border-2 border-dashed border-blue-400 rounded opacity-100 transition-opacity flex items-center justify-center">
+                                      <div className="text-xs text-blue-600 font-medium">Drop Here</div>
+                                    </div>
+                                  )}
 
                                 {slotAppointments.map((appointment) => (
                                   <div
