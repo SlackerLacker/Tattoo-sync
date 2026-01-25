@@ -60,6 +60,9 @@ export async function POST(req: Request) {
           destination: stripeAccountId,
         },
       },
+      metadata: {
+        appointmentId: appointment_id,
+      },
     })
 
     return NextResponse.json({ sessionId: session.id })
