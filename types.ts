@@ -6,6 +6,7 @@ export interface Appointment {
   appointment_date: string
   start_time: string
   duration: number
+  duration_minutes?: number
   status: "confirmed" | "pending" | "cancelled" | "completed" | "in-progress"
   notes?: string
   price?: number
@@ -84,6 +85,7 @@ export interface Artist {
   status: "active" | "on-leave" | "inactive"
   bio: string
   profileImage?: string
+  avatar_url?: string
   nextAppointment: string
   totalAppointments: number
   hourlyRate?: number
@@ -119,9 +121,18 @@ export interface Service {
   description: string
   price: number
   duration: number
+  duration_minutes?: number
   category: string
   artist: string
   availability: string
   bookings: number
   revenue: number
+  popularity?: number
+}
+
+export interface Studio {
+  id: string
+  name: string
+  owner_id: string
+  stripe_account_id?: string
 }
