@@ -1,22 +1,34 @@
-import { createServerClient } from '@supabase/ssr'
-import { cookies as getCookies } from 'next/headers'
 
-export async function createServerSupabase() {
-  const cookieStore = await getCookies()
+import { createServerClient, type CookieOptions } from "@supabase/ssr"
+import { cookies } from "next/headers"
 
+// This is the final, correct implementation for the Next.js App Router.
+// The internal cookie methods are marked as `async` and the `cookies()`
+// function call is `await`ed, which resolves the "should be awaited" error.
+export function createServerSupabase() {
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() {
-          return cookieStore.getAll().map(({ name, value }) => ({ name, value }))
+        async get(name: string) {
+          const cookieStore = await cookies()
+          return cookieStore.get(name)?.value
         },
-        setAll(cookiesToSet) {
-          for (const { name, value, options } of cookiesToSet) {
-            try {
-              cookieStore.set(name, value, options)
-            } catch {}
+        async set(name: string, value: string, options: CookieOptions) {
+          try {
+            const cookieStore = await cookies()
+            cookieStore.set(name, value, options)
+          } catch (error) {
+            // The `set` method was called from a Server Component.
+          }
+        },
+        async remove(name: string, options: CookieOptions) {
+          try {
+            const cookieStore = await cookies()
+            cookieStore.set(name, "", options)
+          } catch (error) {
+            // The `delete` method was called from a Server Component.
           }
         },
       },

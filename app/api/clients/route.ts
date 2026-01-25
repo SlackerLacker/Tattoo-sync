@@ -1,60 +1,46 @@
-import { createServerSupabase } from "@/lib/supabase/server-client"
-import { cookies } from "next/headers"
+
+import { createServerSupabase } from "@/lib/supabase-server"
 import { NextResponse } from "next/server"
 
-export async function GET() {
-  const cookieStore = await cookies()
-  const supabase = createServerSupabase(cookieStore)
-  const { data: clients, error } = await supabase.from("clients").select("*")
-
-  if (error) {
-    return new NextResponse(error.message, { status: 500 })
-  }
-
-  return NextResponse.json(clients)
-}
-
 export async function POST(request: Request) {
-  const cookieStore = await cookies()
-  const supabase = createServerSupabase(cookieStore)
+  const { full_name, email, phone } = await request.json()
+  const supabase = createServerSupabase()
 
+  // Get the current user's studio_id
   const {
     data: { user },
   } = await supabase.auth.getUser()
-  if (!user) {
-    return new NextResponse("User not authenticated", { status: 401 })
+  const { data: userProfile } = await supabase.from("profiles").select("studio_id").eq("id", user?.id).single()
+
+  if (!userProfile?.studio_id) {
+    return new NextResponse("User is not associated with a studio", { status: 400 })
   }
 
-  const { data: userProfile, error: profileError } = await supabase
+  // First, create a profile for the new client
+  const { data: profileData, error: profileError } = await supabase
     .from("profiles")
-    .select("studio_id")
-    .eq("id", user.id)
-    .single()
+    .insert([{ full_name, email, phone, studio_id: userProfile.studio_id }])
+    .select()
 
-  if (profileError || !userProfile) {
-    return new NextResponse("User profile not found", { status: 404 })
+  if (profileError) {
+    console.error("Error creating profile:", profileError)
+    return new NextResponse(profileError.message, { status: 500 })
   }
 
-  const clientData = await request.json()
-  if (clientData.name) {
-    clientData.full_name = clientData.name
-    delete clientData.name
+  const profile = profileData[0]
+
+  // Then, create the client and link it to the profile
+  const { data: clientData, error: clientError } = await supabase
+    .from("clients")
+    .insert([{ id: profile.id, full_name, email, phone, studio_id: userProfile.studio_id }])
+    .select()
+
+  if (clientError) {
+    console.error("Error creating client:", clientError)
+    // If client creation fails, we should roll back the profile creation
+    await supabase.from("profiles").delete().eq("id", profile.id)
+    return new NextResponse(clientError.message, { status: 500 })
   }
 
-  const { data: newClient, error: rpcError } = await supabase.rpc(
-    "create_client_with_profile",
-    {
-      p_full_name: clientData.full_name,
-      p_email: clientData.email,
-      p_phone: clientData.phone || null,
-      p_studio_id: userProfile.studio_id,
-    },
-  )
-
-  if (rpcError) {
-    console.error("Supabase RPC error:", rpcError)
-    return new NextResponse(rpcError.message, { status: 500 })
-  }
-
-  return NextResponse.json(newClient)
+  return NextResponse.json(clientData[0])
 }
