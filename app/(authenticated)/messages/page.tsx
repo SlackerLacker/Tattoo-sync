@@ -186,6 +186,7 @@ export default function MessagesPage() {
                   onValueChange={(value) => {
                     if (!newConversationData.participants.includes(value)) {
                       setNewConversationData({
+                        ...newConversationData,
                         participants: [value],
                       })
                     }
