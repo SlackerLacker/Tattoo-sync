@@ -166,11 +166,6 @@ export default function MessagesPage() {
           <h1 className="text-2xl font-bold tracking-tight">Messages</h1>
           <p className="text-muted-foreground">Communicate with clients and team members</p>
         </div>
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Messages</h1>
-          <p className="text-muted-foreground">Communicate with clients and team members</p>
-        </div>
         <Dialog open={isNewConversationOpen} onOpenChange={setIsNewConversationOpen}>
           <DialogTrigger asChild>
             <Button>
