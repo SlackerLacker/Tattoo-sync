@@ -182,14 +182,12 @@ export default function MessagesPage() {
               <div className="grid gap-2">
                 <Label htmlFor="participants">Select Client</Label>
                 <Select
-                  value=""
+                  value={newConversationData.participants[0] || ""}
                   onValueChange={(value) => {
-                    if (!newConversationData.participants.includes(value)) {
-                      setNewConversationData({
-                        ...newConversationData,
-                        participants: [value],
-                      })
-                    }
+                    setNewConversationData({
+                      ...newConversationData,
+                      participants: [value],
+                    })
                   }}
                 >
                   <SelectTrigger>
