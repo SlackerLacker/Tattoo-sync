@@ -238,9 +238,9 @@ export default function MessagesPage() {
                     <SelectValue placeholder={`Select ${newConversationData.type}`} />
                   </SelectTrigger>
                   <SelectContent>
-                    {(newConversationData.type === "client" ? clients : staff).map((person) => (
-                      <SelectItem key={person.id} value={person.name}>
-                        {person.name} {newConversationData.type === "staff" && `(${(person as any).role})`}
+                    {newConversationData.type === "client" && clients.map((person) => (
+                      <SelectItem key={person.id} value={person.id}>
+                        {person.full_name}
                       </SelectItem>
                     ))}
                   </SelectContent>
