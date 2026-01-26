@@ -2,6 +2,38 @@
 import { createServerSupabase } from "@/lib/supabase-server"
 import { NextResponse } from "next/server"
 
+export async function GET(request: Request) {
+  const supabase = createServerSupabase()
+
+  // Get the current user's studio_id
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return new NextResponse("Unauthorized", { status: 401 })
+  }
+
+  const { data: userProfile } = await supabase.from("profiles").select("studio_id").eq("id", user.id).single()
+
+  if (!userProfile?.studio_id) {
+    return new NextResponse("User is not associated with a studio", { status: 400 })
+  }
+
+  // Fetch clients associated with the studio
+  const { data: clients, error } = await supabase
+    .from("clients")
+    .select("*")
+    .eq("studio_id", userProfile.studio_id)
+
+  if (error) {
+    console.error("Error fetching clients:", error)
+    return new NextResponse(error.message, { status: 500 })
+  }
+
+  return NextResponse.json(clients)
+}
+
 export async function POST(request: Request) {
   const { full_name, email, phone } = await request.json()
   const supabase = createServerSupabase()
