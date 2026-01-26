@@ -51,7 +51,16 @@ export async function POST(request: Request) {
   // First, create a profile for the new client
   const { data: profileData, error: profileError } = await supabase
     .from("profiles")
-    .insert([{ full_name, email, phone, studio_id: userProfile.studio_id }])
+    .insert([
+      {
+        id: crypto.randomUUID(),
+        full_name,
+        email,
+        phone,
+        studio_id: userProfile.studio_id,
+        role: "client",
+      },
+    ])
     .select()
 
   if (profileError) {
