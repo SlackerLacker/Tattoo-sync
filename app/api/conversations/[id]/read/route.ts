@@ -5,10 +5,10 @@ import { NextResponse } from "next/server"
 // POST: Mark conversation as read
 export async function POST(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const supabase = createServerSupabase()
-  const { id: conversationId } = params
+  const { id: conversationId } = await params
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {

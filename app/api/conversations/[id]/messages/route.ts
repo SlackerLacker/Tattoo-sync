@@ -5,10 +5,10 @@ import { NextResponse } from "next/server"
 // GET: Fetch messages for a conversation
 export async function GET(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const supabase = createServerSupabase()
-  const { id: conversationId } = params
+  const { id: conversationId } = await params
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
@@ -37,10 +37,10 @@ export async function GET(
 // POST: Send a new message
 export async function POST(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const supabase = createServerSupabase()
-  const { id: conversationId } = params
+  const { id: conversationId } = await params
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
