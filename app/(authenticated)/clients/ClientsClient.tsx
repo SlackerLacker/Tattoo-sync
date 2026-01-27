@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Input } from "@/components/ui/input"
 import { Plus, Search, Mail, Phone, Calendar, User, Edit, Trash2, MoreHorizontal, MapPin } from "lucide-react"
+import { toast } from "sonner"
 import {
   Dialog,
   DialogContent,
@@ -76,19 +77,27 @@ export default function ClientsClient({ clients: initialClients }: ClientsClient
   const handleAddClient = async () => {
     setFormError(null)
     if (formData.full_name && formData.email) {
-      const response = await fetch("/api/clients", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      })
-      if (response.ok) {
-        const newClient = await response.json()
-        setClients([...(clients || []), newClient])
-        setIsAddDialogOpen(false)
-        resetForm()
-      } else {
-        const { error } = await response.json()
-        setFormError(error)
+      try {
+        const response = await fetch("/api/clients", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(formData),
+        })
+        if (response.ok) {
+          const newClient = await response.json()
+          setClients([...(clients || []), newClient])
+          setIsAddDialogOpen(false)
+          resetForm()
+          toast.success("Client added successfully")
+        } else {
+          const errorMessage = await response.text()
+          setFormError(errorMessage)
+          toast.error(`Failed to add client: ${errorMessage}`)
+        }
+      } catch (error) {
+        console.error(error)
+        setFormError("An unexpected error occurred")
+        toast.error("An unexpected error occurred")
       }
     } else {
       setFormError("Full Name and Email are required.")
