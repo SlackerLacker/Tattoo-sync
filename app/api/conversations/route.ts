@@ -3,8 +3,10 @@ import { createServerSupabase } from "@/lib/supabase-server"
 import { NextResponse } from "next/server"
 
 // GET: List conversations for the current user
-export async function GET() {
+export async function GET(req: Request) {
   const supabase = createServerSupabase()
+  const url = new URL(req.url)
+  const isArchived = url.searchParams.get("archived") === "true"
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
@@ -15,8 +17,9 @@ export async function GET() {
     // 1. Get IDs of conversations the user is part of
     const { data: participations, error: partError } = await supabase
       .from('conversation_participants')
-      .select('conversation_id, last_read_at')
+      .select('conversation_id, last_read_at, is_archived')
       .eq('user_id', user.id)
+      .eq('is_archived', isArchived) // Filter by archived status
 
     if (partError) throw partError
 

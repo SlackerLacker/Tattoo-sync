@@ -62,12 +62,38 @@ export default function MessagesPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         setCurrentUserId(user.id)
-        fetchConversations()
-        fetchClients()
+        // Initial fetch handled by the effect below
       }
     }
     init()
   }, [])
+
+  useEffect(() => {
+    if (currentUserId) {
+      fetchConversations()
+      fetchClients()
+    }
+
+    const channel = supabase
+      .channel('global-messages')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+        },
+        () => {
+          // Refetch to update unread counts and last message
+          fetchConversations()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [activeTab, currentUserId])
 
   const fetchConversations = async () => {
     try {
