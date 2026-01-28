@@ -7,8 +7,9 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Send, Paperclip, Check, CheckCheck, Clock, Smile, ImageIcon } from "lucide-react"
+import { Send, Paperclip, Check, CheckCheck, Clock, Smile, ImageIcon, Trash2, MoreHorizontal } from "lucide-react"
 import { supabase } from "@/lib/supabase-browser"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
 interface Message {
   id: string
@@ -137,6 +138,24 @@ export default function ChatInterface({
     }
   }
 
+  const handleDeleteMessage = async (messageId: string) => {
+    // Optimistic delete
+    setMessages((prev) => prev.filter((m) => m.id !== messageId))
+
+    try {
+      const res = await fetch(`/api/messages/${messageId}`, {
+        method: "DELETE",
+      })
+
+      if (!res.ok) {
+        console.error("Failed to delete message")
+        // Optionally revert state here if needed
+      }
+    } catch (error) {
+      console.error("Error deleting message:", error)
+    }
+  }
+
   const formatTime = (dateString: string) => {
     return new Date(dateString).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
   }
@@ -162,19 +181,37 @@ export default function ChatInterface({
           {messages.map((message) => {
             const isMe = message.sender_id === currentUserId
             return (
-              <div key={message.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
-                <div
-                  className={`max-w-[75%] rounded-lg p-3 ${
-                    isMe ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-900"
-                  }`}
-                >
-                  <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                  <div className="flex items-center justify-end mt-1 gap-1">
-                    <span className={`text-[10px] ${isMe ? "text-blue-100" : "text-gray-500"}`}>
-                      {formatTime(message.created_at)}
-                    </span>
-                    {isMe && message.status === "sending" && <Clock className="h-3 w-3 text-blue-200" />}
+              <div key={message.id} className={`group flex ${isMe ? "justify-end" : "justify-start"}`}>
+                <div className={`flex items-end gap-2 ${isMe ? "flex-row-reverse" : "flex-row"}`}>
+                  <div
+                    className={`max-w-[75%] rounded-lg p-3 ${
+                      isMe ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-900"
+                    }`}
+                  >
+                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                    <div className="flex items-center justify-end mt-1 gap-1">
+                      <span className={`text-[10px] ${isMe ? "text-blue-100" : "text-gray-500"}`}>
+                        {formatTime(message.created_at)}
+                      </span>
+                      {isMe && message.status === "sending" && <Clock className="h-3 w-3 text-blue-200" />}
+                    </div>
                   </div>
+
+                  {isMe && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <MoreHorizontal className="h-4 w-4 text-gray-400" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align={isMe ? "end" : "start"}>
+                        <DropdownMenuItem onClick={() => handleDeleteMessage(message.id)} className="text-red-600">
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
                 </div>
               </div>
             )
