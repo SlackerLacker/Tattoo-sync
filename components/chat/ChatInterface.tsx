@@ -10,6 +10,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Send, Paperclip, Check, CheckCheck, Clock, Smile, ImageIcon, Trash2, MoreHorizontal } from "lucide-react"
 import { supabase } from "@/lib/supabase-browser"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { toast } from "sonner"
 
 interface Message {
   id: string
@@ -20,7 +21,11 @@ interface Message {
     full_name: string
     avatar_url: string
   }
-  attachments?: any[]
+  attachments?: {
+    type: "image" | "file"
+    url: string
+    name: string
+  }[]
   status?: "sending" | "sent" | "delivered" | "read"
 }
 
@@ -103,8 +108,49 @@ export default function ChatInterface({
     }
   }, [conversationId])
 
-  const handleSendMessage = async () => {
-    if (!newMessage.trim()) return
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files
+    if (!files || files.length === 0) return
+
+    const file = files[0]
+    const fileExt = file.name.split(".").pop()
+    const fileName = `${Math.random()}.${fileExt}`
+    const filePath = `${conversationId}/${fileName}`
+
+    try {
+      const { error: uploadError } = await supabase.storage
+        .from("chat-attachments")
+        .upload(filePath, file)
+
+      if (uploadError) {
+        throw uploadError
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from("chat-attachments")
+        .getPublicUrl(filePath)
+
+      const attachment = {
+        type: file.type.startsWith("image/") ? "image" : "file",
+        url: publicUrl,
+        name: file.name,
+      } as const
+
+      await handleSendMessage(undefined, [attachment])
+
+    } catch (error) {
+      console.error("Error uploading file:", error)
+      toast.error("Failed to upload file")
+    } finally {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ""
+      }
+    }
+  }
+
+  const handleSendMessage = async (e?: React.FormEvent, attachments: any[] = []) => {
+    if (e) e.preventDefault()
+    if (!newMessage.trim() && attachments.length === 0) return
 
     const tempId = `temp-${Date.now()}`
     const tempMessage: Message = {
@@ -113,6 +159,7 @@ export default function ChatInterface({
       sender_id: currentUserId,
       created_at: new Date().toISOString(),
       status: "sending",
+      attachments: attachments
     }
 
     // Optimistic update
@@ -123,18 +170,22 @@ export default function ChatInterface({
       const res = await fetch(`/api/conversations/${conversationId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: tempMessage.content }),
+        body: JSON.stringify({
+          content: tempMessage.content,
+          attachments: attachments
+        }),
       })
 
       if (res.ok) {
         const savedMessage = await res.json()
         setMessages((prev) => prev.map((m) => (m.id === tempId ? savedMessage : m)))
       } else {
-        // Handle error (remove temp message or show error)
         console.error("Failed to send")
+        toast.error("Failed to send message")
       }
     } catch (error) {
       console.error("Error sending message:", error)
+      toast.error("Error sending message")
     }
   }
 
@@ -189,6 +240,32 @@ export default function ChatInterface({
                     }`}
                   >
                     <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                  {message.attachments && message.attachments.length > 0 && (
+                    <div className="mt-2 space-y-2">
+                      {message.attachments.map((attachment, index) => (
+                        <div key={index} className="rounded overflow-hidden">
+                          {attachment.type === "image" ? (
+                            <img
+                              src={attachment.url}
+                              alt={attachment.name}
+                              className="max-w-full h-auto max-h-[200px] object-cover cursor-pointer"
+                              onClick={() => window.open(attachment.url, '_blank')}
+                            />
+                          ) : (
+                            <a
+                              href={attachment.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-2 bg-black/10 p-2 rounded text-sm hover:bg-black/20"
+                            >
+                              <Paperclip className="h-4 w-4" />
+                              <span className="truncate max-w-[150px]">{attachment.name}</span>
+                            </a>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                     <div className="flex items-center justify-end mt-1 gap-1">
                       <span className={`text-[10px] ${isMe ? "text-blue-100" : "text-gray-500"}`}>
                         {formatTime(message.created_at)}
@@ -222,7 +299,13 @@ export default function ChatInterface({
 
       <div className="p-4 border-t">
         <div className="flex items-end gap-2">
-           <Button variant="ghost" size="sm" className="hidden sm:inline-flex">
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileUpload}
+            className="hidden"
+          />
+           <Button variant="ghost" size="sm" className="hidden sm:inline-flex" onClick={() => fileInputRef.current?.click()}>
             <Paperclip className="h-4 w-4" />
           </Button>
           <div className="flex-1 relative">
@@ -240,7 +323,7 @@ export default function ChatInterface({
               rows={1}
             />
           </div>
-          <Button onClick={handleSendMessage} disabled={!newMessage.trim()} size="icon" className="shrink-0">
+          <Button onClick={() => handleSendMessage()} disabled={!newMessage.trim()} size="icon" className="shrink-0">
             <Send className="h-4 w-4" />
           </Button>
         </div>
