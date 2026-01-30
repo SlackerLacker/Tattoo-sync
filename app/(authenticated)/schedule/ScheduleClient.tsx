@@ -50,6 +50,9 @@ import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Artist, Service, Client, Appointment } from "@/types"
 import { Switch } from "@/components/ui/switch"
+import { loadStripe } from "@stripe/stripe-js"
+
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
 
 // Shop settings (would normally come from settings page/API)
 const shopSettings = {
@@ -507,7 +510,7 @@ export default function ScheduleClient({
           start_time: decimalToTimeString(startTime),
           duration: durationValue,
           appointment_date: currentDateStr,
-          status: "pending",
+          status: "confirmed",
           price: calculatePrice(dragSelection.artistId, durationValue),
         })
         setIsNewAppointmentDialogOpen(true)
@@ -644,7 +647,7 @@ export default function ScheduleClient({
 
   const handleNewAppointment = () => {
     setFormData({
-      status: "pending",
+      status: "confirmed",
       appointment_date: currentDate.toISOString().split("T")[0],
       start_time: "09:00:00",
       duration: 60,
@@ -796,13 +799,46 @@ export default function ScheduleClient({
     }
   }
 
-  const handleStripeCheckout = (amount: number) => {
-    // TODO: Integrate with Stripe
-    console.log("Redirecting to Stripe checkout for $", amount)
-    // For now, simulate successful payment
-    setTimeout(() => {
-      completePayment("card", amount, 0)
-    }, 2000)
+  const handleStripeCheckout = async (amount: number) => {
+    if (!selectedAppointment) return
+
+    try {
+      const response = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          appointment_id: selectedAppointment.id,
+          amount: amount,
+          tip: 0
+        }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok && (data.sessionId || data.url)) {
+        if (data.url) {
+          window.location.href = data.url
+          return
+        }
+
+        const stripe = await stripePromise
+        if (stripe) {
+          const { error } = await (stripe as any).redirectToCheckout({ sessionId: data.sessionId })
+          if (error) {
+            console.error("Stripe redirect error:", error)
+            alert("Failed to redirect to checkout")
+          }
+        } else {
+          alert("Stripe failed to load")
+        }
+      } else {
+        console.error("Failed to create Stripe session:", data.error)
+        alert("Failed to initiate payment")
+      }
+    } catch (error) {
+      console.error("Error initiating Stripe checkout:", error)
+      alert("An error occurred")
+    }
   }
 
   const handleCashAppPayment = (amount: number) => {
@@ -1756,7 +1792,32 @@ export default function ScheduleClient({
                 <Button variant="outline" onClick={() => setIsViewDialogOpen(false)}>
                   Close
                 </Button>
-                <Button onClick={() => openEditDialog(selectedAppointment)}>Edit Appointment</Button>
+                {selectedAppointment.payment_status !== "paid" && (
+                  <Button onClick={() => {
+                    setIsViewDialogOpen(false)
+                    openCheckoutDialog(selectedAppointment)
+                  }} className="bg-green-600 hover:bg-green-700">
+                    Checkout
+                  </Button>
+                )}
+                <Button onClick={() => openEditDialog(selectedAppointment)}>Edit</Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="icon">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => updateAppointmentStatus(selectedAppointment.id, "cancelled")} className="text-red-600">
+                      <XCircle className="mr-2 h-4 w-4" />
+                      Cancel
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => updateAppointmentStatus(selectedAppointment.id, "cancelled")} className="text-orange-600">
+                      <AlertCircle className="mr-2 h-4 w-4" />
+                      No Show
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
           )}

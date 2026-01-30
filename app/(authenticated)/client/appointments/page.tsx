@@ -98,7 +98,7 @@ const appointments: Appointment[] = [
   },
   {
     id: 3,
-    artist: 3,
+    artistId: 3,
     artistName: "Jake Thompson",
     artistSpecialty: "Realism",
     service: "Dog Portrait Memorial - Upper Arm",

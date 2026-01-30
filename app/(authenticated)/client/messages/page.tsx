@@ -1,9 +1,6 @@
-import React from "react";
 "use client"
 
-import type React from "react"
-
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -12,29 +9,14 @@ import {
   ArrowLeft,
   Search,
   Star,
+  MessageSquare,
+  Plus
 } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
-import { MessageSquare } from "lucide-react"
 import ChatInterface from "@/components/chat/ChatInterface"
 import { supabase } from "@/lib/supabase-browser"
-
-interface Conversation {
-  id: string
-  artistId: string
-  artistName: string
-  artistSpecialty: string
-  artistAvatar: string
-  last_message: {
-    content: string
-    created_at: string
-  }
-  unread_count: number
-  updated_at: string
-}
-
-import { Plus } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -46,6 +28,19 @@ import {
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
+interface Conversation {
+  id: string
+  participants: any[]
+  last_message: {
+    content: string
+    created_at: string
+    attachments?: any[]
+  }
+  unread_count: number
+  updated_at: string
+}
+
+export default function ClientMessagesPage() {
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null)
   const [currentUserId, setCurrentUserId] = useState<string>("")
@@ -251,7 +246,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
                           <AvatarFallback>
                             {getConversationName(conversation)
                               .split(" ")
-                              .map((n) => n[0])
+                              .map((n: string) => n[0])
                               .join("")
                               .substring(0, 2)}
                           </AvatarFallback>
@@ -275,7 +270,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
                           <span className="text-xs text-gray-500">Artist</span>
                         </div>
                         <p className="text-sm text-gray-600 truncate">
-                          {conversation.last_message?.content || "No messages yet"}
+                          {conversation.last_message?.content || (conversation.last_message?.attachments && conversation.last_message.attachments.length > 0 ? "Attachment sent" : "No messages yet")}
                         </p>
                       </div>
                     </div>
