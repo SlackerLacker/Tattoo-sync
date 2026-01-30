@@ -118,6 +118,20 @@ export default function MessagesPage() {
     }
   }
 
+  const handleMarkAsRead = async (id: string) => {
+    try {
+      await fetch(`/api/conversations/${id}/read`, {
+        method: "POST",
+      })
+      // Update local state
+      setConversations(prev =>
+        prev.map(c => (c.id === id ? { ...c, unread_count: 0 } : c))
+      )
+    } catch (error) {
+      console.error("Error marking conversation as read:", error)
+    }
+  }
+
   const handleArchiveConversation = async (id: string) => {
     try {
       const res = await fetch(`/api/conversations/${id}`, {
@@ -348,7 +362,12 @@ export default function MessagesPage() {
                       className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors hover:bg-gray-50 ${
                         selectedConversation?.id === conversation.id ? "bg-blue-50 border-l-4 border-blue-500" : ""
                       }`}
-                      onClick={() => setSelectedConversation(conversation)}
+                        onClick={() => {
+                          setSelectedConversation(conversation)
+                          if (conversation.unread_count > 0) {
+                            handleMarkAsRead(conversation.id)
+                          }
+                        }}
                     >
                       <div className="relative">
                         <Avatar className="h-10 w-10">
