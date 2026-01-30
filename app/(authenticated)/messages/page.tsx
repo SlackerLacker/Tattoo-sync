@@ -100,7 +100,12 @@ export default function MessagesPage() {
 
   const fetchConversations = async () => {
     try {
-      const res = await fetch("/api/conversations")
+      const params = new URLSearchParams()
+      if (activeTab === "archived") {
+        params.append("archived", "true")
+      }
+
+      const res = await fetch(`/api/conversations?${params.toString()}`)
       if (res.ok) {
         const data = await res.json()
         setConversations(data)
@@ -110,6 +115,42 @@ export default function MessagesPage() {
       }
     } catch (error) {
       console.error("Error fetching conversations:", error)
+    }
+  }
+
+  const handleArchiveConversation = async (id: string) => {
+    try {
+      const res = await fetch(`/api/conversations/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_archived: true }),
+      })
+      if (res.ok) {
+        setConversations(prev => prev.filter(c => c.id !== id))
+        if (selectedConversation?.id === id) {
+          setSelectedConversation(null)
+        }
+      }
+    } catch (error) {
+      console.error("Error archiving conversation:", error)
+    }
+  }
+
+  const handleDeleteConversation = async (id: string) => {
+    if (!confirm("Are you sure you want to leave this conversation?")) return
+
+    try {
+      const res = await fetch(`/api/conversations/${id}`, {
+        method: "DELETE",
+      })
+      if (res.ok) {
+        setConversations(prev => prev.filter(c => c.id !== id))
+        if (selectedConversation?.id === id) {
+          setSelectedConversation(null)
+        }
+      }
+    } catch (error) {
+      console.error("Error deleting conversation:", error)
     }
   }
 
