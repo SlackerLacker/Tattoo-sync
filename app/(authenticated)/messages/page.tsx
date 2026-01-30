@@ -14,6 +14,8 @@ import {
   Plus,
   Star,
   Archive,
+  MoreHorizontal,
+  Trash2,
 } from "lucide-react"
 import {
   Dialog,
@@ -23,6 +25,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -282,12 +285,15 @@ export default function MessagesPage() {
                 />
               </div>
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
+                <TabsList className="grid w-full grid-cols-3">
                   <TabsTrigger value="all" className="text-xs">
                     All
                   </TabsTrigger>
                   <TabsTrigger value="unread" className="text-xs">
                     Unread
+                  </TabsTrigger>
+                  <TabsTrigger value="archived" className="text-xs">
+                    Archived
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
@@ -348,14 +354,35 @@ export default function MessagesPage() {
           </Card>
 
           {/* Chat Area */}
-          <Card className="lg:col-span-2 flex flex-col h-full">
+          <Card className="lg:col-span-2 flex flex-col h-full relative">
             {selectedConversation ? (
-              <ChatInterface
-                conversationId={selectedConversation.id}
-                currentUserId={currentUserId}
-                recipientName={getConversationName(selectedConversation)}
-                recipientAvatar={selectedConversation.participants?.[0]?.avatar_url}
-              />
+              <>
+                <div className="absolute top-4 right-4 z-10">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => handleArchiveConversation(selectedConversation.id)}>
+                        <Archive className="mr-2 h-4 w-4" />
+                        Archive Conversation
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleDeleteConversation(selectedConversation.id)} className="text-red-600">
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete Conversation
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+                <ChatInterface
+                  conversationId={selectedConversation.id}
+                  currentUserId={currentUserId}
+                  recipientName={getConversationName(selectedConversation)}
+                  recipientAvatar={selectedConversation.participants?.[0]?.avatar_url}
+                />
+              </>
             ) : (
               <CardContent className="p-12 text-center flex-1 flex items-center justify-center">
                 <div className="text-gray-500">
