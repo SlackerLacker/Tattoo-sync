@@ -41,6 +41,7 @@ interface Conversation {
   last_message: {
     content: string
     created_at: string
+    attachments?: any[]
   }
   unread_count: number
   is_starred: boolean
@@ -377,7 +378,7 @@ export default function MessagesPage() {
                           <AvatarFallback className="text-xs">
                             {getConversationName(conversation)
                               .split(" ")
-                              .map((n) => n[0])
+                              .map((n: string) => n[0])
                               .join("")
                               .substring(0, 2)}
                           </AvatarFallback>
@@ -403,7 +404,7 @@ export default function MessagesPage() {
                           </div>
                         </div>
                         <p className="text-sm text-muted-foreground mt-1 overflow-hidden truncate">
-                          {conversation.last_message?.content || "No messages yet"}
+                          {conversation.last_message?.content || (conversation.last_message?.attachments && conversation.last_message.attachments.length > 0 ? "Attachment sent" : "No messages yet")}
                         </p>
                       </div>
                     </div>

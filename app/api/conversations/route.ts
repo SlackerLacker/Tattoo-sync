@@ -50,14 +50,14 @@ export async function GET(req: Request) {
       if (pError) console.error("Error fetching participants", pError)
 
       // Fetch profiles for these participants
-      let participantProfiles = []
+      let participantProfiles: any[] = []
       if (participants && participants.length > 0) {
          const { data: profiles, error: profError } = await supabase
            .from('profiles')
            .select('id, full_name, avatar_url, role')
-           .in('id', participants.map(p => p.user_id))
+           .in('id', participants.map((p: any) => p.user_id))
 
-         if (!profError) participantProfiles = profiles
+         if (!profError && profiles) participantProfiles = profiles
       }
 
       // Get last message
