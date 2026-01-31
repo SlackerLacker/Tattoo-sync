@@ -1,9 +1,15 @@
 import { createServerSupabase } from "@/lib/supabase-server"
 import { NextResponse } from "next/server"
 
+<<<<<<< HEAD
+export async function GET(request: Request, { params }: { params: { id: string } }) {
+  const supabase = createServerSupabase()
+  const id = params.id
+=======
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const supabase = createServerSupabase()
   const { id } = await params
+>>>>>>> jules-5480036992904768726-6ad232be
 
   // Step 1: Fetch the artist
   const { data: artist, error: artistError } = await supabase
@@ -34,9 +40,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   return NextResponse.json(artist)
 }
 
+<<<<<<< HEAD
+export async function PUT(request: Request, { params }: { params: { id: string } }) {
+  const supabase = createServerSupabase()
+  const id = params.id
+=======
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const supabase = createServerSupabase()
   const { id } = await params
+>>>>>>> jules-5480036992904768726-6ad232be
 
   const { data: artist, error } = await supabase
     .from("artists")
@@ -51,9 +63,15 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   return NextResponse.json(artist)
 }
 
+<<<<<<< HEAD
+export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+  const supabase = createServerSupabase()
+  const id = params.id
+=======
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const supabase = createServerSupabase()
   const { id } = await params
+>>>>>>> jules-5480036992904768726-6ad232be
 
   const { data: artist, error } = await supabase.from("artists").delete().eq("id", id)
 
