@@ -50,8 +50,14 @@ import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Artist, Service, Client, Appointment } from "@/types"
 import { Switch } from "@/components/ui/switch"
+<<<<<<< HEAD
 import { toast } from "sonner"
 import { loadStripe } from "@stripe/stripe-js"
+=======
+import { loadStripe } from "@stripe/stripe-js"
+
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
+>>>>>>> jules-5480036992904768726-6ad232be
 
 // Shop settings (would normally come from settings page/API)
 const shopSettings = {
@@ -179,7 +185,11 @@ export default function ScheduleClient({
   // Add after the existing dragSelection state
   const [draggedAppointment, setDraggedAppointment] = useState<Appointment | null>(null)
   const [isDraggingAppointment, setIsDraggingAppointment] = useState(false)
+<<<<<<< HEAD
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null)
+=======
+  const [dragOverSlot, setDragOverSlot] = useState<{ artistId: string; time: number } | null>(null)
+>>>>>>> jules-5480036992904768726-6ad232be
 
   // Get day of week for current date
   const getDayOfWeek = (date: Date) => {
@@ -267,13 +277,23 @@ export default function ScheduleClient({
 
   // Get appointments that START in this specific time slot
   const getAppointmentsStartingInSlot = (artistId: string, time: number) => {
-    const currentDateStr = currentDate.toISOString().split("T")[0]
     return appointments.filter((apt) => {
+<<<<<<< HEAD
       if (!apt.appointment_date) return false
       const aptStartTime = timeToDecimal(apt.start_time)
       return (
         apt.artist_id === artistId && apt.appointment_date.startsWith(currentDateStr) && aptStartTime === time
       )
+=======
+      const aptDate = new Date(apt.appointment_date)
+      const isSameDay =
+        aptDate.getFullYear() === currentDate.getFullYear() &&
+        aptDate.getMonth() === currentDate.getMonth() &&
+        aptDate.getDate() === currentDate.getDate()
+
+      const aptStartTime = timeToDecimal(apt.start_time)
+      return apt.artist_id === artistId && isSameDay && aptStartTime === time
+>>>>>>> jules-5480036992904768726-6ad232be
     })
   }
 
@@ -283,12 +303,28 @@ export default function ScheduleClient({
     if (!isShopOpen(time, currentDate) || !isArtistAvailable(artistId, time, currentDate)) return false
 
     const hasAppointment = appointments.some((apt) => {
+<<<<<<< HEAD
       if (!apt.appointment_date) return false
+=======
+      if (draggedAppointment && apt.id === draggedAppointment.id) {
+        return false
+      }
+      const aptDate = new Date(apt.appointment_date)
+      const isSameDay =
+        aptDate.getFullYear() === currentDate.getFullYear() &&
+        aptDate.getMonth() === currentDate.getMonth() &&
+        aptDate.getDate() === currentDate.getDate()
+
+>>>>>>> jules-5480036992904768726-6ad232be
       const aptStartTime = timeToDecimal(apt.start_time)
       const aptDuration = (apt.duration || 60) / 60 // default to 1 hour
       return (
         apt.artist_id === artistId &&
+<<<<<<< HEAD
         apt.appointment_date.startsWith(currentDateStr) &&
+=======
+        isSameDay &&
+>>>>>>> jules-5480036992904768726-6ad232be
         time >= aptStartTime &&
         time < aptStartTime + aptDuration
       )
@@ -301,12 +337,28 @@ export default function ScheduleClient({
     const currentDateStr = currentDate.toISOString().split("T")[0]
 
     const appointment = appointments.find((apt) => {
+<<<<<<< HEAD
       if (!apt.appointment_date) return false
+=======
+      if (draggedAppointment && apt.id === draggedAppointment.id) {
+        return false
+      }
+      const aptDate = new Date(apt.appointment_date)
+      const isSameDay =
+        aptDate.getFullYear() === currentDate.getFullYear() &&
+        aptDate.getMonth() === currentDate.getMonth() &&
+        aptDate.getDate() === currentDate.getDate()
+
+>>>>>>> jules-5480036992904768726-6ad232be
       const aptStartTime = timeToDecimal(apt.start_time)
       const aptDuration = (apt.duration || 60) / 60
       return (
         apt.artist_id === artistId &&
+<<<<<<< HEAD
         apt.appointment_date.startsWith(currentDateStr) &&
+=======
+        isSameDay &&
+>>>>>>> jules-5480036992904768726-6ad232be
         time >= aptStartTime &&
         time < aptStartTime + aptDuration
       )
@@ -430,22 +482,6 @@ export default function ScheduleClient({
     return artists.find((artist) => artist.id === id)
   }
 
-  const getStats = () => {
-    const today = new Date()
-    const upcoming = appointments.filter(
-      (apt) => new Date(apt.appointment_date) >= today && apt.status !== "cancelled",
-    )
-    const confirmed = appointments.filter((apt) => apt.status === "confirmed")
-    const pending = appointments.filter((apt) => apt.status === "pending")
-    const totalRevenue = appointments
-      .filter((apt) => apt.status === "completed")
-      .reduce((sum, apt) => sum + (apt.price || 0), 0)
-
-    return { upcoming: upcoming.length, confirmed: confirmed.length, pending: pending.length, totalRevenue }
-  }
-
-  const stats = getStats()
-
   const calculatePrice = (artistId: any | null | undefined, duration: number | null | undefined) => {
     const artist = getArtistById(artistId)
     if (!artist || !duration) return 0
@@ -515,7 +551,7 @@ export default function ScheduleClient({
           start_time: decimalToTimeString(startTime),
           duration: durationValue,
           appointment_date: currentDateStr,
-          status: "pending",
+          status: "confirmed",
           price: calculatePrice(dragSelection.artistId, durationValue),
         })
         setIsNewAppointmentDialogOpen(true)
@@ -538,6 +574,10 @@ export default function ScheduleClient({
     event.dataTransfer.effectAllowed = "move"
   }, [])
 
+  const handleSlotDragLeave = useCallback(() => {
+    setDragOverSlot(null)
+  }, [])
+
   const handleAppointmentDragEnd = useCallback(() => {
     setDraggedAppointment(null)
     setIsDraggingAppointment(false)
@@ -549,7 +589,11 @@ export default function ScheduleClient({
       if (isDraggingAppointment) {
         event.preventDefault()
         event.dataTransfer.dropEffect = "move"
+<<<<<<< HEAD
         setDropTarget({ artistId, time })
+=======
+        setDragOverSlot({ artistId, time })
+>>>>>>> jules-5480036992904768726-6ad232be
       }
     },
     [isDraggingAppointment],
@@ -578,12 +622,21 @@ export default function ScheduleClient({
           return false
         }
         const hasConflict = appointments.some(
-          (apt) =>
-            apt.id !== draggedAppointment.id &&
-            apt.artist_id === artistId &&
-            apt.appointment_date === currentDateStr &&
-            slot >= timeToDecimal(apt.start_time) &&
-            slot < timeToDecimal(apt.start_time) + (apt.duration || 60) / 60,
+          (apt) => {
+            const aptDate = new Date(apt.appointment_date)
+            const isSameDay =
+              aptDate.getFullYear() === currentDate.getFullYear() &&
+              aptDate.getMonth() === currentDate.getMonth() &&
+              aptDate.getDate() === currentDate.getDate()
+
+            return (
+              apt.id !== draggedAppointment.id &&
+              apt.artist_id === artistId &&
+              isSameDay &&
+              slot >= timeToDecimal(apt.start_time) &&
+              slot < timeToDecimal(apt.start_time) + (apt.duration || 60) / 60
+            )
+          }
         )
         return !hasConflict
       })
@@ -678,7 +731,7 @@ export default function ScheduleClient({
 
   const handleNewAppointment = () => {
     setFormData({
-      status: "pending",
+      status: "confirmed",
       appointment_date: currentDate.toISOString().split("T")[0],
       start_time: "09:00:00",
       duration: 60,
@@ -833,14 +886,19 @@ export default function ScheduleClient({
   }
 
   const handleStripeCheckout = async (amount: number) => {
+<<<<<<< HEAD
     if (!selectedAppointment) {
       toast.error("No appointment selected for checkout.")
       return
     }
+=======
+    if (!selectedAppointment) return
+>>>>>>> jules-5480036992904768726-6ad232be
 
     try {
       const response = await fetch("/api/stripe/checkout", {
         method: "POST",
+<<<<<<< HEAD
         headers: {
           "Content-Type": "application/json",
         },
@@ -869,6 +927,41 @@ export default function ScheduleClient({
     } catch (error) {
       console.error("Error during Stripe checkout process:", error)
       toast.error("Could not connect to payment provider.")
+=======
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          appointment_id: selectedAppointment.id,
+          amount: amount,
+          tip: 0
+        }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok && (data.sessionId || data.url)) {
+        if (data.url) {
+          window.location.href = data.url
+          return
+        }
+
+        const stripe = await stripePromise
+        if (stripe) {
+          const { error } = await (stripe as any).redirectToCheckout({ sessionId: data.sessionId })
+          if (error) {
+            console.error("Stripe redirect error:", error)
+            alert("Failed to redirect to checkout")
+          }
+        } else {
+          alert("Stripe failed to load")
+        }
+      } else {
+        console.error("Failed to create Stripe session:", data.error)
+        alert("Failed to initiate payment")
+      }
+    } catch (error) {
+      console.error("Error initiating Stripe checkout:", error)
+      alert("An error occurred")
+>>>>>>> jules-5480036992904768726-6ad232be
     }
   }
 
@@ -1093,6 +1186,44 @@ export default function ScheduleClient({
     return filtered
   }, [appointments, searchTerm, statusFilter, artistFilter, dateFilter])
 
+  const stats = useMemo(() => {
+    const data = viewMode === "calendar" ? appointments : filteredAppointments
+    const title =
+      viewMode === "calendar"
+        ? isToday(currentDate)
+          ? "Today"
+          : formatDate(currentDate.toISOString())
+        : "Filtered List"
+
+    const appointmentsForDate =
+      viewMode === "calendar"
+        ? data.filter((apt) => {
+            const aptDate = new Date(apt.appointment_date)
+            return (
+              aptDate.getFullYear() === currentDate.getFullYear() &&
+              aptDate.getMonth() === currentDate.getMonth() &&
+              aptDate.getDate() === currentDate.getDate()
+            )
+          })
+        : data
+
+    const revenue = appointmentsForDate.reduce((sum, apt) => {
+      if (apt.payment_status === "paid" || apt.status === "completed") {
+        return sum + (apt.price || 0)
+      }
+      return sum
+    }, 0)
+
+    const totalBookedHours = appointmentsForDate.reduce((sum, apt) => sum + (apt.duration || 0), 0) / 60
+
+    return {
+      title,
+      appointments: appointmentsForDate.length,
+      revenue,
+      bookedHours: totalBookedHours.toFixed(1),
+    }
+  }, [viewMode, appointments, filteredAppointments, currentDate])
+
   return (
     <div className="flex flex-1 flex-col gap-4" onMouseUp={handleMouseUp}>
       <div className="flex items-center justify-between">
@@ -1259,7 +1390,7 @@ export default function ScheduleClient({
                                 </div>
 
                                 {available && !isDragSelected && (
-                                  <div className="absolute inset-1 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                                  <div className="absolute inset-1 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                                     <Plus className="h-4 w-4 text-green-600" />
                                   </div>
                                 )}
@@ -1293,11 +1424,14 @@ export default function ScheduleClient({
                                 )}
 
                                 {/* Drop zone indicator when dragging */}
-                                {isDraggingAppointment && available && (
-                                  <div className="absolute inset-1 border-2 border-dashed border-blue-400 rounded opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                    <div className="text-xs text-blue-600 font-medium">Drop Here</div>
-                                  </div>
-                                )}
+                                {isDraggingAppointment &&
+                                  available &&
+                                  dragOverSlot?.artistId === artist.id &&
+                                  dragOverSlot?.time === time && (
+                                    <div className="absolute inset-1 border-2 border-dashed border-blue-400 rounded opacity-100 transition-opacity flex items-center justify-center">
+                                      <div className="text-xs text-blue-600 font-medium">Drop Here</div>
+                                    </div>
+                                  )}
 
                                 {slotAppointments.map((appointment) => (
                                   <div
@@ -1419,72 +1553,65 @@ export default function ScheduleClient({
           </Card>
 
           {/* Summary Stats */}
-          <div className="grid grid-cols-4 gap-4">
-            {artists.map((artist) => {
-              const currentDateStr = currentDate.toISOString().split("T")[0]
-              const artistAppointments = appointments.filter(
-                (apt) => apt.artist_id == artist.id && apt.appointment_date === currentDateStr,
-              )
-              const totalMinutes = artistAppointments.reduce((sum, apt) => sum + (apt.duration || 0), 0)
-              const totalHours = totalMinutes / 60
-              const totalRevenue = artistAppointments.reduce((sum, apt) => sum + (apt.price || 0), 0)
-
-              return (
-                <Card key={artist.id}>
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className={`w-3 h-3 rounded-full bg-blue-500`}></div>
-                      <span className="font-medium text-sm">{artist.name}</span>
-                    </div>
-                    <div className="space-y-1 text-xs text-gray-600">
-                      <div>{artistAppointments.length} appointments</div>
-                      <div>{totalHours.toFixed(1)} hours booked</div>
-                      <div>${totalRevenue} revenue</div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )
-            })}
+          <div className="grid gap-4 md:grid-cols-3">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Appointments ({stats.title})</CardTitle>
+                <CalendarDays className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.appointments}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Revenue ({stats.title})</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">${stats.revenue.toLocaleString()}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Booked Hours ({stats.title})</CardTitle>
+                <Clock className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.bookedHours}</div>
+              </CardContent>
+            </Card>
           </div>
         </>
       ) : (
         <>
           {/* Stats Cards for List View */}
-          <div className="grid gap-4 md:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-3">
             <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2">
-                  <CalendarDays className="h-4 w-4 text-blue-600" />
-                  <span className="text-sm font-medium">Upcoming</span>
-                </div>
-                <p className="text-2xl font-bold mt-2">{stats.upcoming}</p>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Appointments ({stats.title})</CardTitle>
+                <CalendarDays className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.appointments}</div>
               </CardContent>
             </Card>
             <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-green-600" />
-                  <span className="text-sm font-medium">Confirmed</span>
-                </div>
-                <p className="text-2xl font-bold mt-2">{stats.confirmed}</p>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Revenue ({stats.title})</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">${stats.revenue.toLocaleString()}</div>
               </CardContent>
             </Card>
             <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4 text-yellow-600" />
-                  <span className="text-sm font-medium">Pending</span>
-                </div>
-                <p className="text-2xl font-bold mt-2">{stats.pending}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2">
-                  <DollarSign className="h-4 w-4 text-green-600" />
-                  <span className="text-sm font-medium">Revenue (Completed)</span>
-                </div>
-                <p className="text-2xl font-bold mt-2">${stats.totalRevenue.toLocaleString()}</p>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Booked Hours ({stats.title})</CardTitle>
+                <Clock className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.bookedHours}</div>
               </CardContent>
             </Card>
           </div>
@@ -1792,7 +1919,32 @@ export default function ScheduleClient({
                 <Button variant="outline" onClick={() => setIsViewDialogOpen(false)}>
                   Close
                 </Button>
-                <Button onClick={() => openEditDialog(selectedAppointment)}>Edit Appointment</Button>
+                {selectedAppointment.payment_status !== "paid" && (
+                  <Button onClick={() => {
+                    setIsViewDialogOpen(false)
+                    openCheckoutDialog(selectedAppointment)
+                  }} className="bg-green-600 hover:bg-green-700">
+                    Checkout
+                  </Button>
+                )}
+                <Button onClick={() => openEditDialog(selectedAppointment)}>Edit</Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="icon">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => updateAppointmentStatus(selectedAppointment.id, "cancelled")} className="text-red-600">
+                      <XCircle className="mr-2 h-4 w-4" />
+                      Cancel
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => updateAppointmentStatus(selectedAppointment.id, "cancelled")} className="text-orange-600">
+                      <AlertCircle className="mr-2 h-4 w-4" />
+                      No Show
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
           )}
