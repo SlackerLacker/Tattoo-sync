@@ -50,14 +50,10 @@ import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Artist, Service, Client, Appointment } from "@/types"
 import { Switch } from "@/components/ui/switch"
-<<<<<<< HEAD
 import { toast } from "sonner"
-import { loadStripe } from "@stripe/stripe-js"
-=======
 import { loadStripe } from "@stripe/stripe-js"
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
->>>>>>> jules-5480036992904768726-6ad232be
 
 // Shop settings (would normally come from settings page/API)
 const shopSettings = {
@@ -185,11 +181,7 @@ export default function ScheduleClient({
   // Add after the existing dragSelection state
   const [draggedAppointment, setDraggedAppointment] = useState<Appointment | null>(null)
   const [isDraggingAppointment, setIsDraggingAppointment] = useState(false)
-<<<<<<< HEAD
-  const [dropTarget, setDropTarget] = useState<DropTarget | null>(null)
-=======
   const [dragOverSlot, setDragOverSlot] = useState<{ artistId: string; time: number } | null>(null)
->>>>>>> jules-5480036992904768726-6ad232be
 
   // Get day of week for current date
   const getDayOfWeek = (date: Date) => {
@@ -278,13 +270,7 @@ export default function ScheduleClient({
   // Get appointments that START in this specific time slot
   const getAppointmentsStartingInSlot = (artistId: string, time: number) => {
     return appointments.filter((apt) => {
-<<<<<<< HEAD
       if (!apt.appointment_date) return false
-      const aptStartTime = timeToDecimal(apt.start_time)
-      return (
-        apt.artist_id === artistId && apt.appointment_date.startsWith(currentDateStr) && aptStartTime === time
-      )
-=======
       const aptDate = new Date(apt.appointment_date)
       const isSameDay =
         aptDate.getFullYear() === currentDate.getFullYear() &&
@@ -293,38 +279,31 @@ export default function ScheduleClient({
 
       const aptStartTime = timeToDecimal(apt.start_time)
       return apt.artist_id === artistId && isSameDay && aptStartTime === time
->>>>>>> jules-5480036992904768726-6ad232be
     })
   }
 
   const isAvailable = (artistId: string, time: number) => {
-    const currentDateStr = currentDate.toISOString().split("T")[0]
-
     if (!isShopOpen(time, currentDate) || !isArtistAvailable(artistId, time, currentDate)) return false
 
     const hasAppointment = appointments.some((apt) => {
-<<<<<<< HEAD
       if (!apt.appointment_date) return false
-=======
+
+      // Don't count the appointment being dragged as a conflict
       if (draggedAppointment && apt.id === draggedAppointment.id) {
         return false
       }
+
       const aptDate = new Date(apt.appointment_date)
       const isSameDay =
         aptDate.getFullYear() === currentDate.getFullYear() &&
         aptDate.getMonth() === currentDate.getMonth() &&
         aptDate.getDate() === currentDate.getDate()
 
->>>>>>> jules-5480036992904768726-6ad232be
       const aptStartTime = timeToDecimal(apt.start_time)
       const aptDuration = (apt.duration || 60) / 60 // default to 1 hour
       return (
         apt.artist_id === artistId &&
-<<<<<<< HEAD
-        apt.appointment_date.startsWith(currentDateStr) &&
-=======
         isSameDay &&
->>>>>>> jules-5480036992904768726-6ad232be
         time >= aptStartTime &&
         time < aptStartTime + aptDuration
       )
@@ -334,31 +313,25 @@ export default function ScheduleClient({
   }
 
   const getSlotStatus = (artistId: string, time: number) => {
-    const currentDateStr = currentDate.toISOString().split("T")[0]
-
     const appointment = appointments.find((apt) => {
-<<<<<<< HEAD
       if (!apt.appointment_date) return false
-=======
+
+      // Don't count the appointment being dragged as occupying the slot
       if (draggedAppointment && apt.id === draggedAppointment.id) {
         return false
       }
+
       const aptDate = new Date(apt.appointment_date)
       const isSameDay =
         aptDate.getFullYear() === currentDate.getFullYear() &&
         aptDate.getMonth() === currentDate.getMonth() &&
         aptDate.getDate() === currentDate.getDate()
 
->>>>>>> jules-5480036992904768726-6ad232be
       const aptStartTime = timeToDecimal(apt.start_time)
       const aptDuration = (apt.duration || 60) / 60
       return (
         apt.artist_id === artistId &&
-<<<<<<< HEAD
-        apt.appointment_date.startsWith(currentDateStr) &&
-=======
         isSameDay &&
->>>>>>> jules-5480036992904768726-6ad232be
         time >= aptStartTime &&
         time < aptStartTime + aptDuration
       )
@@ -581,7 +554,7 @@ export default function ScheduleClient({
   const handleAppointmentDragEnd = useCallback(() => {
     setDraggedAppointment(null)
     setIsDraggingAppointment(false)
-    setDropTarget(null)
+    setDragOverSlot(null)
   }, [])
 
   const handleSlotDragOver = useCallback(
@@ -589,19 +562,11 @@ export default function ScheduleClient({
       if (isDraggingAppointment) {
         event.preventDefault()
         event.dataTransfer.dropEffect = "move"
-<<<<<<< HEAD
-        setDropTarget({ artistId, time })
-=======
         setDragOverSlot({ artistId, time })
->>>>>>> jules-5480036992904768726-6ad232be
       }
     },
     [isDraggingAppointment],
   )
-
-  const handleSlotDragLeave = useCallback(() => {
-    setDropTarget(null)
-  }, [])
 
   const handleSlotDrop = useCallback(
     async (artistId: string, time: number, event: React.DragEvent) => {
@@ -657,7 +622,7 @@ export default function ScheduleClient({
 
         if (response.ok) {
           const updatedAppointmentResult = await response.json()
-          const flatAppointment = updatedAppointmentResult[0]
+          const flatAppointment = updatedAppointmentResult[0] || updatedAppointmentResult
 
           // The API returns a flat object. We need to manually reconstruct the
           // 'enriched' object with nested client, artist, and service details
@@ -680,12 +645,13 @@ export default function ScheduleClient({
         } else {
           // If the API call fails, we don't update the UI
           console.error("Failed to move appointment")
+          toast.error("Failed to move appointment")
         }
       }
 
       setDraggedAppointment(null)
       setIsDraggingAppointment(false)
-      setDropTarget(null)
+      setDragOverSlot(null)
     },
     [draggedAppointment, isDraggingAppointment, appointments, currentDate],
   )
@@ -702,12 +668,12 @@ export default function ScheduleClient({
   }
 
   const isDropTarget = (artistId: string, time: number) => {
-    if (!dropTarget || !draggedAppointment || dropTarget.artistId !== artistId) {
+    if (!dragOverSlot || !draggedAppointment || dragOverSlot.artistId !== artistId) {
       return false
     }
 
     const durationInHours = (draggedAppointment.duration || 60) / 60
-    const startTime = dropTarget.time
+    const startTime = dragOverSlot.time
     const endTime = startTime + durationInHours
 
     return time >= startTime && time < endTime
@@ -796,7 +762,7 @@ export default function ScheduleClient({
 
     if (appointmentResponse.ok) {
       const newAppointmentResult = await appointmentResponse.json()
-      const newAppointment = newAppointmentResult[0]
+      const newAppointment = newAppointmentResult[0] || newAppointmentResult
 
       // Manually construct the full appointment object for immediate UI update
       // The API returns a flat object, but the calendar component needs the nested objects
@@ -834,7 +800,7 @@ export default function ScheduleClient({
     if (response.ok) {
       const updatedAppointment = await response.json()
       setAppointments(
-        appointments.map((apt) => (apt.id === selectedAppointment.id ? updatedAppointment[0] : apt)),
+        appointments.map((apt) => (apt.id === selectedAppointment.id ? (updatedAppointment[0] || updatedAppointment) : apt)),
       )
       setIsEditDialogOpen(false)
       resetForm()
@@ -886,48 +852,11 @@ export default function ScheduleClient({
   }
 
   const handleStripeCheckout = async (amount: number) => {
-<<<<<<< HEAD
-    if (!selectedAppointment) {
-      toast.error("No appointment selected for checkout.")
-      return
-    }
-=======
     if (!selectedAppointment) return
->>>>>>> jules-5480036992904768726-6ad232be
 
     try {
       const response = await fetch("/api/stripe/checkout", {
         method: "POST",
-<<<<<<< HEAD
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ appointment: selectedAppointment }),
-      })
-
-      if (!response.ok) {
-        toast.error(`Payment API error: ${response.statusText}`)
-        return
-      }
-
-      const session = await response.json()
-
-      if (!session || !session.id) {
-        toast.error("Failed to create a valid payment session.")
-        return
-      }
-
-      // The session object now contains a `url` property.
-      // We will use this to redirect the user to the Stripe checkout page.
-      if (session.url) {
-        window.location.href = session.url
-      } else {
-        toast.error("Could not get checkout URL. Please try again.")
-      }
-    } catch (error) {
-      console.error("Error during Stripe checkout process:", error)
-      toast.error("Could not connect to payment provider.")
-=======
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           appointment_id: selectedAppointment.id,
@@ -949,19 +878,18 @@ export default function ScheduleClient({
           const { error } = await (stripe as any).redirectToCheckout({ sessionId: data.sessionId })
           if (error) {
             console.error("Stripe redirect error:", error)
-            alert("Failed to redirect to checkout")
+            toast.error("Failed to redirect to checkout")
           }
         } else {
-          alert("Stripe failed to load")
+          toast.error("Stripe failed to load")
         }
       } else {
         console.error("Failed to create Stripe session:", data.error)
-        alert("Failed to initiate payment")
+        toast.error("Failed to initiate payment")
       }
     } catch (error) {
       console.error("Error initiating Stripe checkout:", error)
-      alert("An error occurred")
->>>>>>> jules-5480036992904768726-6ad232be
+      toast.error("An error occurred")
     }
   }
 
@@ -978,7 +906,7 @@ export default function ScheduleClient({
     resetCheckout()
 
     // Show confirmation that link was sent
-    alert("Cash App payment link opened. Please confirm payment in Cash App.")
+    toast.success("Cash App payment link opened. Please confirm payment in Cash App.")
   }
 
   const handleVenmoPayment = (amount: number) => {
@@ -1000,7 +928,7 @@ export default function ScheduleClient({
     resetCheckout()
 
     // Show confirmation that link was sent
-    alert("Venmo payment link opened. Please confirm payment in Venmo.")
+    toast.success("Venmo payment link opened. Please confirm payment in Venmo.")
   }
 
   const handleCashPayment = () => {
@@ -1028,7 +956,7 @@ export default function ScheduleClient({
       if (response.ok) {
         const updatedAppointment = await response.json()
         setAppointments(
-          appointments.map((apt) => (apt.id === selectedAppointment.id ? updatedAppointment[0] : apt)),
+          appointments.map((apt) => (apt.id === selectedAppointment.id ? (updatedAppointment[0] || updatedAppointment) : apt)),
         )
         setSelectedAppointment(null)
       }
@@ -1070,7 +998,7 @@ export default function ScheduleClient({
     if (response.ok) {
       const updatedAppointment = await response.json()
       setAppointments(
-        appointments.map((apt) => (apt.id === appointmentId ? updatedAppointment[0] : apt)),
+        appointments.map((apt) => (apt.id === appointmentId ? (updatedAppointment[0] || updatedAppointment) : apt)),
       )
     }
   }
