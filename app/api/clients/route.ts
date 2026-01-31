@@ -2,8 +2,6 @@
 import { createServerSupabase } from "@/lib/supabase-server"
 import { NextResponse } from "next/server"
 
-<<<<<<< HEAD
-=======
 export async function GET(request: Request) {
   const supabase = createServerSupabase()
 
@@ -36,7 +34,6 @@ export async function GET(request: Request) {
   return NextResponse.json(clients)
 }
 
->>>>>>> jules-5480036992904768726-6ad232be
 export async function POST(request: Request) {
   const { full_name, email, phone } = await request.json()
   const supabase = createServerSupabase()
@@ -54,9 +51,6 @@ export async function POST(request: Request) {
   // First, create a profile for the new client
   const { data: profileData, error: profileError } = await supabase
     .from("profiles")
-<<<<<<< HEAD
-    .insert([{ full_name, email, phone, studio_id: userProfile.studio_id }])
-=======
     .insert([
       {
         id: crypto.randomUUID(),
@@ -67,7 +61,6 @@ export async function POST(request: Request) {
         role: "client",
       },
     ])
->>>>>>> jules-5480036992904768726-6ad232be
     .select()
 
   if (profileError) {
