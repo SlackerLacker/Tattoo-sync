@@ -1,9 +1,9 @@
 import { createServerSupabase } from "@/lib/supabase-server"
 import { NextResponse } from "next/server"
 
-export async function PATCH(request: Request, { params }: { params: { piece_id: string } }) {
+export async function PATCH(request: Request, { params }: { params: Promise<{ piece_id: string }> }) {
   const supabase = createServerSupabase()
-  const pieceId = params.piece_id
+  const { piece_id: pieceId } = await params
 
   if (!pieceId) {
     return new NextResponse("Missing piece ID", { status: 400 })
@@ -33,9 +33,9 @@ export async function PATCH(request: Request, { params }: { params: { piece_id: 
   }
 }
 
-export async function PUT(request: Request, { params }: { params: { piece_id: string } }) {
+export async function PUT(request: Request, { params }: { params: Promise<{ piece_id: string }> }) {
   const supabase = createServerSupabase()
-  const pieceId = params.piece_id
+  const { piece_id: pieceId } = await params
 
   if (!pieceId) {
     return new NextResponse("Missing piece ID", { status: 400 })
@@ -61,9 +61,9 @@ export async function PUT(request: Request, { params }: { params: { piece_id: st
   }
 }
 
-export async function DELETE(request: Request, { params }: { params: { piece_id: string } }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ piece_id: string }> }) {
   const supabase = createServerSupabase()
-  const pieceId = params.piece_id
+  const { piece_id: pieceId } = await params
 
   if (!pieceId) {
     return new NextResponse("Missing piece ID", { status: 400 })
