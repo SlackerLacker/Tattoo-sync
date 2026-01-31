@@ -4,7 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 
 export async function checkSuperadmin() {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
 
   const supabaseSSR = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
