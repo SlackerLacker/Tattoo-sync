@@ -1,9 +1,9 @@
 import { createServerSupabase } from "@/lib/supabase-server"
 import { NextResponse } from "next/server"
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const supabase = createServerSupabase()
-  const id = params.id
+  const { id } = await params
 
   // Step 1: Fetch the artist
   const { data: artist, error: artistError } = await supabase
@@ -34,9 +34,9 @@ export async function GET(request: Request, { params }: { params: { id: string }
   return NextResponse.json(artist)
 }
 
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
+export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const supabase = createServerSupabase()
-  const id = params.id
+  const { id } = await params
 
   const { data: artist, error } = await supabase
     .from("artists")
@@ -51,9 +51,9 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   return NextResponse.json(artist)
 }
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const supabase = createServerSupabase()
-  const id = params.id
+  const { id } = await params
 
   const { data: artist, error } = await supabase.from("artists").delete().eq("id", id)
 

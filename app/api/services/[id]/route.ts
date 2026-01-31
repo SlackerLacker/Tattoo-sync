@@ -1,9 +1,9 @@
 import { createServerSupabase } from "@/lib/supabase-server"
 import { NextResponse } from "next/server"
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const supabase = createServerSupabase()
-  const id = params.id
+  const { id } = await params
 
   const { data: service, error } = await supabase.from("services").select("*").eq("id", id).single()
 
@@ -14,9 +14,9 @@ export async function GET(request: Request, { params }: { params: { id: string }
   return NextResponse.json(service)
 }
 
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
+export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const supabase = createServerSupabase()
-  const id = params.id
+  const { id } = await params
 
   const { data: service, error } = await supabase
     .from("services")
@@ -31,9 +31,9 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   return NextResponse.json(service)
 }
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const supabase = createServerSupabase()
-  const id = params.id
+  const { id } = await params
 
   const { data: service, error } = await supabase.from("services").delete().eq("id", id)
 
