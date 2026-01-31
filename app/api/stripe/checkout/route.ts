@@ -41,6 +41,7 @@ export async function POST(req: Request) {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL
     const baseUrl = appUrl?.startsWith("http") ? appUrl : `https://${appUrl}`
 
+    // Use Direct Charge (on behalf of connected account)
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       line_items: [
@@ -48,7 +49,7 @@ export async function POST(req: Request) {
           price_data: {
             currency: "usd",
             product_data: {
-              name: `Appointment on ${new Date(appointment.appointment_date).toLocaleDateString()}`, // Fixed: use appointment_date
+              name: `Appointment on ${new Date(appointment.appointment_date).toLocaleDateString()}`,
             },
             unit_amount: Math.round(totalAmount * 100), // Convert to cents and ensure integer
           },
@@ -56,17 +57,16 @@ export async function POST(req: Request) {
         },
       ],
       mode: "payment",
-      success_url: `${baseUrl}/schedule`, // Redirect back to schedule
+      success_url: `${baseUrl}/schedule`,
       cancel_url: `${baseUrl}/schedule`,
       payment_intent_data: {
         application_fee_amount: platformFee,
-        transfer_data: {
-          destination: stripeAccountId,
-        },
       },
       metadata: {
         appointmentId: appointment_id,
       },
+    }, {
+      stripeAccount: stripeAccountId,
     })
 
     return NextResponse.json({ sessionId: session.id, url: session.url })
