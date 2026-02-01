@@ -545,9 +545,6 @@ export default function ScheduleClient({
     [isDraggingAppointment],
   )
 
-  const handleSlotDragLeave = useCallback(() => {
-    setDropTarget(null)
-  }, [])
 
   const handleSlotDrop = useCallback(
     async (artistId: string, time: number, event: React.DragEvent) => {
