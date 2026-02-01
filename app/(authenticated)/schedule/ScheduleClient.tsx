@@ -1138,13 +1138,13 @@ export default function ScheduleClient({
     const appointmentsForDate =
       viewMode === "calendar"
         ? data.filter((apt) => {
-            const aptDate = new Date(apt.appointment_date)
-            return (
-              aptDate.getFullYear() === currentDate.getFullYear() &&
-              aptDate.getMonth() === currentDate.getMonth() &&
-              aptDate.getDate() === currentDate.getDate()
-            )
-          })
+          const aptDate = new Date(apt.appointment_date)
+          return (
+            aptDate.getFullYear() === currentDate.getFullYear() &&
+            aptDate.getMonth() === currentDate.getMonth() &&
+            aptDate.getDate() === currentDate.getDate()
+          )
+        })
         : data
 
     const revenue = appointmentsForDate.reduce((sum, apt) => {
@@ -1191,7 +1191,7 @@ export default function ScheduleClient({
         </div>
       </div>
 
-      {viewMode === "calendar" ? (
+      {viewMode === "calendar" && (
         <>
           {/* Date Navigation */}
           <div className="flex items-center justify-between">
@@ -1306,13 +1306,11 @@ export default function ScheduleClient({
                                   slotStatus,
                                   isDragSelected,
                                   isTarget,
-                                )} ${available ? "hover:bg-green-100" : ""} ${
-                                  isDragSelected ? "border-2 border-blue-400" : ""
-                                } ${
-                                  isDraggingAppointment && available && !isTarget
+                                )} ${available ? "hover:bg-green-100" : ""} ${isDragSelected ? "border-2 border-blue-400" : ""
+                                  } ${isDraggingAppointment && available && !isTarget
                                     ? "hover:bg-blue-100 hover:border-2 hover:border-blue-300"
                                     : ""
-                                }`}
+                                  }`}
                                 onClick={() =>
                                   !dragSelection.isDragging &&
                                   !isDraggingAppointment &&
@@ -1378,11 +1376,10 @@ export default function ScheduleClient({
                                     key={appointment.id}
                                     className={`absolute inset-1 rounded-lg p-2 border shadow-sm overflow-hidden ${getStatusColor(
                                       appointment.status,
-                                    )} group cursor-move hover:shadow-md transition-all z-10 ${
-                                      isDraggingAppointment && draggedAppointment?.id === appointment.id
+                                    )} group cursor-move hover:shadow-md transition-all z-10 ${isDraggingAppointment && draggedAppointment?.id === appointment.id
                                         ? "opacity-50 scale-105"
                                         : ""
-                                    }`}
+                                      }`}
                                     style={{
                                       height: `calc(${((appointment.duration || 60) / 15) * 30}px - 8px)`,
                                     }}
@@ -1448,14 +1445,14 @@ export default function ScheduleClient({
                                               Confirm
                                             </DropdownMenuItem>
                                           )}
-                                          {appointment.status === "confirmed" && !isPast && (
-                                            <DropdownMenuItem
-                                              onClick={() => updateAppointmentStatus(appointment.id, "completed")}
-                                            >
-                                              <CheckCircle className="mr-2 h-4 w-4" />
-                                              Mark Complete
-                                    </DropdownMenuItem>
-                                          )}
+                                          {appointment.status === "confirmed" &&
+                                            new Date(appointment.appointment_date) >= new Date(new Date().toDateString()) && (
+                                              <DropdownMenuItem onClick={() => updateAppointmentStatus(appointment.id, "completed")}>
+                                                <CheckCircle className="mr-2 h-4 w-4" />
+                                                Mark Complete
+                                              </DropdownMenuItem>
+                                            )}
+
                                           {(appointment.status === "confirmed" || appointment.status === "in-progress") &&
                                             appointment.payment_status !== "paid" && (
                                               <DropdownMenuItem onClick={() => openCheckoutDialog(appointment)}>
@@ -1534,7 +1531,7 @@ export default function ScheduleClient({
                     {formatTime(timeToDecimal(selectedAppointment.start_time))} -{" "}
                     {formatTime(
                       timeToDecimal(selectedAppointment.start_time) +
-                        (selectedAppointment.duration || 0) / 60,
+                      (selectedAppointment.duration || 0) / 60,
                     )}
                   </p>
                 </div>
@@ -1991,7 +1988,7 @@ export default function ScheduleClient({
                         {Math.max(
                           0,
                           cashPaymentData.amountReceived -
-                            ((selectedAppointment.price || 0) - (selectedAppointment.deposit_paid || 0)),
+                          ((selectedAppointment.price || 0) - (selectedAppointment.deposit_paid || 0)),
                         ).toFixed(2)}
                       </span>
                     </div>
