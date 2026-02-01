@@ -525,8 +525,9 @@ export default function ScheduleClient({
   }, [])
 
   const handleSlotDragLeave = useCallback(() => {
+    if (!isDraggingAppointment) return
     setDragOverSlot(null)
-  }, [])
+  }, [isDraggingAppointment])
 
   const handleAppointmentDragEnd = useCallback(() => {
     setDraggedAppointment(null)
@@ -544,7 +545,6 @@ export default function ScheduleClient({
     },
     [isDraggingAppointment],
   )
-
 
   const handleSlotDrop = useCallback(
     async (artistId: string, time: number, event: React.DragEvent) => {
@@ -1101,13 +1101,13 @@ export default function ScheduleClient({
     const appointmentsForDate =
       viewMode === "calendar"
         ? data.filter((apt) => {
-            const aptDate = new Date(apt.appointment_date)
-            return (
-              aptDate.getFullYear() === currentDate.getFullYear() &&
-              aptDate.getMonth() === currentDate.getMonth() &&
-              aptDate.getDate() === currentDate.getDate()
-            )
-          })
+          const aptDate = new Date(apt.appointment_date)
+          return (
+            aptDate.getFullYear() === currentDate.getFullYear() &&
+            aptDate.getMonth() === currentDate.getMonth() &&
+            aptDate.getDate() === currentDate.getDate()
+          )
+        })
         : data
 
     const revenue = appointmentsForDate.reduce((sum, apt) => {
@@ -1269,13 +1269,11 @@ export default function ScheduleClient({
                                   slotStatus,
                                   isDragSelected,
                                   isTarget,
-                                )} ${available ? "hover:bg-green-100" : ""} ${
-                                  isDragSelected ? "border-2 border-blue-400" : ""
-                                } ${
-                                  isDraggingAppointment && available && !isTarget
+                                )} ${available ? "hover:bg-green-100" : ""} ${isDragSelected ? "border-2 border-blue-400" : ""
+                                  } ${isDraggingAppointment && available && !isTarget
                                     ? "hover:bg-blue-100 hover:border-2 hover:border-blue-300"
                                     : ""
-                                }`}
+                                  }`}
                                 onClick={() =>
                                   !dragSelection.isDragging &&
                                   !isDraggingAppointment &&
@@ -1341,11 +1339,10 @@ export default function ScheduleClient({
                                     key={appointment.id}
                                     className={`absolute inset-1 rounded-lg p-2 border shadow-sm overflow-hidden ${getStatusColor(
                                       appointment.status,
-                                    )} group cursor-move hover:shadow-md transition-all z-10 ${
-                                      isDraggingAppointment && draggedAppointment?.id === appointment.id
+                                    )} group cursor-move hover:shadow-md transition-all z-10 ${isDraggingAppointment && draggedAppointment?.id === appointment.id
                                         ? "opacity-50 scale-105"
                                         : ""
-                                    }`}
+                                      }`}
                                     style={{
                                       height: `calc(${((appointment.duration || 60) / 15) * 30}px - 8px)`,
                                     }}
@@ -1413,13 +1410,13 @@ export default function ScheduleClient({
                                           )}
                                           {(appointment.status === "confirmed" ||
                                             appointment.status === "in-progress") && (
-                                            <DropdownMenuItem
-                                              onClick={() => updateAppointmentStatus(appointment.id, "in-progress")}
-                                            >
-                                              <Clock className="mr-2 h-4 w-4" />
-                                              Start Session
-                                            </DropdownMenuItem>
-                                          )}
+                                              <DropdownMenuItem
+                                                onClick={() => updateAppointmentStatus(appointment.id, "in-progress")}
+                                              >
+                                                <Clock className="mr-2 h-4 w-4" />
+                                                Start Session
+                                              </DropdownMenuItem>
+                                            )}
                                           {(appointment.status === "confirmed" ||
                                             appointment.status === "in-progress") &&
                                             appointment.payment_status !== "paid" && (
@@ -1595,9 +1592,8 @@ export default function ScheduleClient({
                     return (
                       <Card
                         key={appointment.id}
-                        className={`transition-colors hover:bg-gray-50 ${
-                          isAppointmentToday ? "border-blue-200 bg-blue-50" : ""
-                        }`}
+                        className={`transition-colors hover:bg-gray-50 ${isAppointmentToday ? "border-blue-200 bg-blue-50" : ""
+                          }`}
                       >
                         <CardContent className="p-4">
                           <div className="flex items-center justify-between">
@@ -1640,7 +1636,7 @@ export default function ScheduleClient({
                                     {formatTime(timeToDecimal(appointment.start_time))} -{" "}
                                     {formatTime(
                                       timeToDecimal(appointment.start_time) +
-                                        (appointment.duration || 0) / 60,
+                                      (appointment.duration || 0) / 60,
                                     )}
                                   </div>
                                   <div className="flex items-center gap-1">
@@ -1765,7 +1761,7 @@ export default function ScheduleClient({
                     {formatTime(timeToDecimal(selectedAppointment.start_time))} -{" "}
                     {formatTime(
                       timeToDecimal(selectedAppointment.start_time) +
-                        (selectedAppointment.duration || 0) / 60,
+                      (selectedAppointment.duration || 0) / 60,
                     )}
                   </p>
                 </div>
@@ -2222,7 +2218,7 @@ export default function ScheduleClient({
                         {Math.max(
                           0,
                           cashPaymentData.amountReceived -
-                            ((selectedAppointment.price || 0) - (selectedAppointment.deposit_paid || 0)),
+                          ((selectedAppointment.price || 0) - (selectedAppointment.deposit_paid || 0)),
                         ).toFixed(2)}
                       </span>
                     </div>
