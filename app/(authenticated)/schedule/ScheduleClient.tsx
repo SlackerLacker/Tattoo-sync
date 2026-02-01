@@ -50,14 +50,10 @@ import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Artist, Service, Client, Appointment } from "@/types"
 import { Switch } from "@/components/ui/switch"
-<<<<<<< HEAD
 import { toast } from "sonner"
-import { loadStripe } from "@stripe/stripe-js"
-=======
 import { loadStripe } from "@stripe/stripe-js"
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
->>>>>>> jules-5480036992904768726-6ad232be
 
 // Shop settings (would normally come from settings page/API)
 const shopSettings = {
@@ -185,11 +181,8 @@ export default function ScheduleClient({
   // Add after the existing dragSelection state
   const [draggedAppointment, setDraggedAppointment] = useState<Appointment | null>(null)
   const [isDraggingAppointment, setIsDraggingAppointment] = useState(false)
-<<<<<<< HEAD
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null)
-=======
   const [dragOverSlot, setDragOverSlot] = useState<{ artistId: string; time: number } | null>(null)
->>>>>>> jules-5480036992904768726-6ad232be
 
   // Get day of week for current date
   const getDayOfWeek = (date: Date) => {
@@ -278,22 +271,11 @@ export default function ScheduleClient({
   // Get appointments that START in this specific time slot
   const getAppointmentsStartingInSlot = (artistId: string, time: number) => {
     return appointments.filter((apt) => {
-<<<<<<< HEAD
       if (!apt.appointment_date) return false
       const aptStartTime = timeToDecimal(apt.start_time)
       return (
         apt.artist_id === artistId && apt.appointment_date.startsWith(currentDateStr) && aptStartTime === time
       )
-=======
-      const aptDate = new Date(apt.appointment_date)
-      const isSameDay =
-        aptDate.getFullYear() === currentDate.getFullYear() &&
-        aptDate.getMonth() === currentDate.getMonth() &&
-        aptDate.getDate() === currentDate.getDate()
-
-      const aptStartTime = timeToDecimal(apt.start_time)
-      return apt.artist_id === artistId && isSameDay && aptStartTime === time
->>>>>>> jules-5480036992904768726-6ad232be
     })
   }
 
@@ -303,28 +285,12 @@ export default function ScheduleClient({
     if (!isShopOpen(time, currentDate) || !isArtistAvailable(artistId, time, currentDate)) return false
 
     const hasAppointment = appointments.some((apt) => {
-<<<<<<< HEAD
       if (!apt.appointment_date) return false
-=======
-      if (draggedAppointment && apt.id === draggedAppointment.id) {
-        return false
-      }
-      const aptDate = new Date(apt.appointment_date)
-      const isSameDay =
-        aptDate.getFullYear() === currentDate.getFullYear() &&
-        aptDate.getMonth() === currentDate.getMonth() &&
-        aptDate.getDate() === currentDate.getDate()
-
->>>>>>> jules-5480036992904768726-6ad232be
       const aptStartTime = timeToDecimal(apt.start_time)
       const aptDuration = (apt.duration || 60) / 60 // default to 1 hour
       return (
         apt.artist_id === artistId &&
-<<<<<<< HEAD
         apt.appointment_date.startsWith(currentDateStr) &&
-=======
-        isSameDay &&
->>>>>>> jules-5480036992904768726-6ad232be
         time >= aptStartTime &&
         time < aptStartTime + aptDuration
       )
@@ -337,28 +303,12 @@ export default function ScheduleClient({
     const currentDateStr = currentDate.toISOString().split("T")[0]
 
     const appointment = appointments.find((apt) => {
-<<<<<<< HEAD
       if (!apt.appointment_date) return false
-=======
-      if (draggedAppointment && apt.id === draggedAppointment.id) {
-        return false
-      }
-      const aptDate = new Date(apt.appointment_date)
-      const isSameDay =
-        aptDate.getFullYear() === currentDate.getFullYear() &&
-        aptDate.getMonth() === currentDate.getMonth() &&
-        aptDate.getDate() === currentDate.getDate()
-
->>>>>>> jules-5480036992904768726-6ad232be
       const aptStartTime = timeToDecimal(apt.start_time)
       const aptDuration = (apt.duration || 60) / 60
       return (
         apt.artist_id === artistId &&
-<<<<<<< HEAD
         apt.appointment_date.startsWith(currentDateStr) &&
-=======
-        isSameDay &&
->>>>>>> jules-5480036992904768726-6ad232be
         time >= aptStartTime &&
         time < aptStartTime + aptDuration
       )
@@ -589,11 +539,7 @@ export default function ScheduleClient({
       if (isDraggingAppointment) {
         event.preventDefault()
         event.dataTransfer.dropEffect = "move"
-<<<<<<< HEAD
         setDropTarget({ artistId, time })
-=======
-        setDragOverSlot({ artistId, time })
->>>>>>> jules-5480036992904768726-6ad232be
       }
     },
     [isDraggingAppointment],
@@ -886,19 +832,14 @@ export default function ScheduleClient({
   }
 
   const handleStripeCheckout = async (amount: number) => {
-<<<<<<< HEAD
     if (!selectedAppointment) {
       toast.error("No appointment selected for checkout.")
       return
     }
-=======
-    if (!selectedAppointment) return
->>>>>>> jules-5480036992904768726-6ad232be
 
     try {
       const response = await fetch("/api/stripe/checkout", {
         method: "POST",
-<<<<<<< HEAD
         headers: {
           "Content-Type": "application/json",
         },
@@ -927,41 +868,6 @@ export default function ScheduleClient({
     } catch (error) {
       console.error("Error during Stripe checkout process:", error)
       toast.error("Could not connect to payment provider.")
-=======
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          appointment_id: selectedAppointment.id,
-          amount: amount,
-          tip: 0
-        }),
-      })
-
-      const data = await response.json()
-
-      if (response.ok && (data.sessionId || data.url)) {
-        if (data.url) {
-          window.location.href = data.url
-          return
-        }
-
-        const stripe = await stripePromise
-        if (stripe) {
-          const { error } = await (stripe as any).redirectToCheckout({ sessionId: data.sessionId })
-          if (error) {
-            console.error("Stripe redirect error:", error)
-            alert("Failed to redirect to checkout")
-          }
-        } else {
-          alert("Stripe failed to load")
-        }
-      } else {
-        console.error("Failed to create Stripe session:", data.error)
-        alert("Failed to initiate payment")
-      }
-    } catch (error) {
-      console.error("Error initiating Stripe checkout:", error)
-      alert("An error occurred")
->>>>>>> jules-5480036992904768726-6ad232be
     }
   }
 
