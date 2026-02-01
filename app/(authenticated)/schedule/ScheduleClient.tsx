@@ -272,10 +272,17 @@ export default function ScheduleClient({
   const getAppointmentsStartingInSlot = (artistId: string, time: number) => {
     return appointments.filter((apt) => {
       if (!apt.appointment_date) return false
+      const aptDate = new Date(apt.appointment_date)
+
+      const isSameDay =
+        aptDate.getFullYear() === currentDate.getFullYear() &&
+        aptDate.getMonth() === currentDate.getMonth() &&
+        aptDate.getDate() === currentDate.getDate()
+
       const aptStartTime = timeToDecimal(apt.start_time)
-      return (
-        apt.artist_id === artistId && apt.appointment_date.startsWith(currentDateStr) && aptStartTime === time
-      )
+
+      return apt.artist_id === artistId && isSameDay && aptStartTime === time
+
     })
   }
 
@@ -1340,8 +1347,8 @@ export default function ScheduleClient({
                                     className={`absolute inset-1 rounded-lg p-2 border shadow-sm overflow-hidden ${getStatusColor(
                                       appointment.status,
                                     )} group cursor-move hover:shadow-md transition-all z-10 ${isDraggingAppointment && draggedAppointment?.id === appointment.id
-                                        ? "opacity-50 scale-105"
-                                        : ""
+                                      ? "opacity-50 scale-105"
+                                      : ""
                                       }`}
                                     style={{
                                       height: `calc(${((appointment.duration || 60) / 15) * 30}px - 8px)`,
