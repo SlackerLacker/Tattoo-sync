@@ -8,14 +8,16 @@ import { toast } from "sonner"
 export default function ConnectStripe({
   studio,
 }: {
-  studio: { stripe_account_id: string; id: string }
+  studio: { stripe_account_id: string; id: string; name?: string | null }
 }) {
   const [loading, setLoading] = useState(false)
+  const [requesting, setRequesting] = useState(false)
+  const [requestSent, setRequestSent] = useState(false)
 
-  const handleConnect = async () => {
-    setLoading(true)
+  const handleRequest = async () => {
+    setRequesting(true)
     try {
-      const response = await fetch("/api/stripe/account", {
+      const response = await fetch("/api/stripe/connect-request", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -26,7 +28,8 @@ export default function ConnectStripe({
       const data = await response.json()
 
       if (response.ok) {
-        window.location.href = data.url
+        setRequestSent(true)
+        toast.success("Request sent! We'll reach out shortly.")
       } else {
         toast.error(data.error || "An unexpected error occurred.")
       }
@@ -34,7 +37,7 @@ export default function ConnectStripe({
       console.error(error)
       toast.error("An unexpected error occurred.")
     } finally {
-      setLoading(false)
+      setRequesting(false)
     }
   }
 
@@ -68,9 +71,9 @@ export default function ConnectStripe({
     <div className="bg-gray-50 p-6 rounded-lg shadow-inner">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold">Connect your Stripe account</h3>
+          <h3 className="text-lg font-semibold">Stripe payouts</h3>
           <p className="text-sm text-gray-500">
-            Securely connect your Stripe account to start accepting payments.
+            Request Stripe Connect access so your shop can accept card payments.
           </p>
         </div>
         {studio.stripe_account_id ? (
@@ -85,14 +88,14 @@ export default function ConnectStripe({
             )}
           </Button>
         ) : (
-          <Button onClick={handleConnect} disabled={loading}>
-            {loading ? (
+          <Button onClick={handleRequest} disabled={requesting || requestSent}>
+            {requesting ? (
               <>
                 <Loader className="mr-2 h-4 w-4 animate-spin" />
-                <span>Redirecting...</span>
+                <span>Sending...</span>
               </>
             ) : (
-              <span>Connect with Stripe</span>
+              <span>{requestSent ? "Request sent" : "Request Stripe access"}</span>
             )}
           </Button>
         )}
