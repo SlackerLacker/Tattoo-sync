@@ -194,9 +194,9 @@ export default function FinancialsPage() {
 
   return (
     <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
-      <div className="flex items-center justify-between space-y-2">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-3xl font-bold tracking-tight">Financials</h2>
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Dialog open={shopPaymentDialogOpen} onOpenChange={setShopPaymentDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="outline">
@@ -212,7 +212,7 @@ export default function FinancialsPage() {
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-4 items-center gap-4">
+                <div className="grid gap-2 sm:grid-cols-4 sm:items-center">
                   <Label htmlFor="artist" className="text-right">
                     Artist
                   </Label>
@@ -229,13 +229,13 @@ export default function FinancialsPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="grid grid-cols-4 items-center gap-4">
+                <div className="grid gap-2 sm:grid-cols-4 sm:items-center">
                   <Label htmlFor="amount" className="text-right">
                     Amount
                   </Label>
                   <Input id="amount" placeholder="$0.00" className="col-span-3" />
                 </div>
-                <div className="grid grid-cols-4 items-center gap-4">
+                <div className="grid gap-2 sm:grid-cols-4 sm:items-center">
                   <Label htmlFor="payment-method" className="text-right">
                     Method
                   </Label>
@@ -271,7 +271,7 @@ export default function FinancialsPage() {
                 <DialogDescription>Send earnings to an artist via their preferred payment method.</DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-4 items-center gap-4">
+                <div className="grid gap-2 sm:grid-cols-4 sm:items-center">
                   <Label htmlFor="artist" className="text-right">
                     Artist
                   </Label>
@@ -288,13 +288,13 @@ export default function FinancialsPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="grid grid-cols-4 items-center gap-4">
+                <div className="grid gap-2 sm:grid-cols-4 sm:items-center">
                   <Label htmlFor="amount" className="text-right">
                     Amount
                   </Label>
                   <Input id="amount" placeholder="$0.00" className="col-span-3" />
                 </div>
-                <div className="grid grid-cols-4 items-center gap-4">
+                <div className="grid gap-2 sm:grid-cols-4 sm:items-center">
                   <Label htmlFor="method" className="text-right">
                     Method
                   </Label>
@@ -320,7 +320,7 @@ export default function FinancialsPage() {
       </div>
 
       {/* Overview Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Artist Earnings</CardTitle>
@@ -405,7 +405,7 @@ export default function FinancialsPage() {
       )}
 
       <Tabs defaultValue="artists" className="space-y-4">
-        <TabsList>
+        <TabsList className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
           <TabsTrigger value="artists">Artist Earnings</TabsTrigger>
           <TabsTrigger value="transactions">Transactions</TabsTrigger>
           <TabsTrigger value="shop-payments">Shop Payments</TabsTrigger>
@@ -419,7 +419,8 @@ export default function FinancialsPage() {
               <CardDescription>Track individual artist earnings, commissions, and payment structures</CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
+              <div className="overflow-x-auto">
+                <Table className="min-w-[900px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Artist</TableHead>
@@ -489,7 +490,8 @@ export default function FinancialsPage() {
                     </TableRow>
                   ))}
                 </TableBody>
-              </Table>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -501,7 +503,8 @@ export default function FinancialsPage() {
               <CardDescription>All appointment payments with commission calculations</CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
+              <div className="overflow-x-auto">
+                <Table className="min-w-[900px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Date</TableHead>
@@ -541,7 +544,8 @@ export default function FinancialsPage() {
                     </TableRow>
                   ))}
                 </TableBody>
-              </Table>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -553,7 +557,8 @@ export default function FinancialsPage() {
               <CardDescription>Payments received from artists (commissions and booth rent)</CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
+              <div className="overflow-x-auto">
+                <Table className="min-w-[720px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Date</TableHead>
@@ -585,7 +590,8 @@ export default function FinancialsPage() {
                     </TableRow>
                   ))}
                 </TableBody>
-              </Table>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -601,7 +607,7 @@ export default function FinancialsPage() {
             <CardContent>
               <div className="space-y-6">
                 {mockArtists.map((artist) => (
-                  <div key={artist.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div key={artist.id} className="flex flex-col gap-4 p-4 border rounded-lg sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-3">
                       <Avatar className="h-10 w-10">
                         <AvatarImage src={artist.avatar || "/placeholder.svg"} />
@@ -622,9 +628,9 @@ export default function FinancialsPage() {
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
                       <Select defaultValue={artist.paymentStructure}>
-                        <SelectTrigger className="w-40">
+                        <SelectTrigger className="w-full sm:w-40">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -633,7 +639,7 @@ export default function FinancialsPage() {
                         </SelectContent>
                       </Select>
                       <Input
-                        className="w-24"
+                        className="w-full sm:w-24"
                         placeholder={artist.paymentStructure === "percentage" ? "70%" : "$800"}
                         defaultValue={
                           artist.paymentStructure === "percentage" ? artist.commissionRate : artist.boothRent

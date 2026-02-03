@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import {
   MessageSquare,
   Search,
@@ -57,6 +58,7 @@ export default function MessagesPage() {
   const [activeTab, setActiveTab] = useState("all")
   const [isNewConversationOpen, setIsNewConversationOpen] = useState(false)
   const [clients, setClients] = useState<any[]>([])
+  const [newMessageText, setNewMessageText] = useState("")
   const [newConversationData, setNewConversationData] = useState<{
     participants: string[]
   }>({ participants: [] })
@@ -151,6 +153,24 @@ export default function MessagesPage() {
     }
   }
 
+  const handleRestoreConversation = async (id: string) => {
+    try {
+      const res = await fetch(`/api/conversations/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_archived: false }),
+      })
+      if (res.ok) {
+        setConversations(prev => prev.filter(c => c.id !== id))
+        if (selectedConversation?.id === id) {
+          setSelectedConversation(null)
+        }
+      }
+    } catch (error) {
+      console.error("Error restoring conversation:", error)
+    }
+  }
+
   const handleDeleteConversation = async (id: string) => {
     if (!confirm("Are you sure you want to leave this conversation?")) return
 
@@ -171,7 +191,7 @@ export default function MessagesPage() {
 
   const fetchClients = async () => {
     try {
-      const res = await fetch("/api/clients")
+      const res = await fetch("/api/clients?source=profiles")
       if (res.ok) {
         const data = await res.json()
         setClients(data)
@@ -196,16 +216,18 @@ export default function MessagesPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           participant_ids: newConversationData.participants,
-          studio_id: profile?.studio_id
+          studio_id: profile?.studio_id,
+          initial_message: newMessageText.trim() || null
         })
       })
 
       if (res.ok) {
         const newConv = await res.json()
         await fetchConversations()
-        // Select the new conversation (needs full enriched object, so simplified here by refetch)
         setIsNewConversationOpen(false)
         setNewConversationData({ participants: [] })
+        setNewMessageText("")
+        setSelectedConversation(newConv)
       }
     } catch (error) {
       console.error("Error creating conversation:", error)
@@ -239,6 +261,8 @@ export default function MessagesPage() {
     switch (activeTab) {
       case "unread":
         return matchesSearch && conv.unread_count > 0
+      case "all":
+        return matchesSearch && !conv.is_archived
       default:
         return matchesSearch
     }
@@ -246,7 +270,7 @@ export default function MessagesPage() {
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 max-w-full">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Messages</h1>
           <p className="text-muted-foreground">Communicate with clients and team members</p>
@@ -287,6 +311,16 @@ export default function MessagesPage() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="grid gap-2">
+                <Label htmlFor="initial-message">Message</Label>
+                <Textarea
+                  id="initial-message"
+                  placeholder="Write a message to start the conversation..."
+                  value={newMessageText}
+                  onChange={(e) => setNewMessageText(e.target.value)}
+                  rows={3}
+                />
+              </div>
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setIsNewConversationOpen(false)}>
@@ -301,7 +335,7 @@ export default function MessagesPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4 px-4">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 px-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-2">
@@ -372,9 +406,7 @@ export default function MessagesPage() {
                     >
                       <div className="relative">
                         <Avatar className="h-10 w-10">
-                          <AvatarImage
-                            src={conversation.participants?.[0]?.avatar_url || "/placeholder.svg"}
-                          />
+                          <AvatarImage src={conversation.participants?.[0]?.avatar_url || undefined} />
                           <AvatarFallback className="text-xs">
                             {getConversationName(conversation)
                               .split(" ")
@@ -426,10 +458,17 @@ export default function MessagesPage() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => handleArchiveConversation(selectedConversation.id)}>
-                        <Archive className="mr-2 h-4 w-4" />
-                        Archive Conversation
-                      </DropdownMenuItem>
+                      {activeTab === "archived" ? (
+                        <DropdownMenuItem onClick={() => handleRestoreConversation(selectedConversation.id)}>
+                          <Archive className="mr-2 h-4 w-4" />
+                          Restore Conversation
+                        </DropdownMenuItem>
+                      ) : (
+                        <DropdownMenuItem onClick={() => handleArchiveConversation(selectedConversation.id)}>
+                          <Archive className="mr-2 h-4 w-4" />
+                          Archive Conversation
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuItem onClick={() => handleDeleteConversation(selectedConversation.id)} className="text-red-600">
                         <Trash2 className="mr-2 h-4 w-4" />
                         Delete Conversation

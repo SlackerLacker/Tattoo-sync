@@ -47,6 +47,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import Link from "next/link"
 import { Artist, specialtyOptions, socialPlatforms } from "@/types"
+import { supabase } from "@/lib/supabase-browser"
 
 interface ArtistsClientProps {
   artists: Artist[]
@@ -59,6 +60,38 @@ export default function ArtistsClient({ artists: initialArtists }: ArtistsClient
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [formData, setFormData] = useState<Partial<Artist>>({})
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
+
+  const getInitials = (name: string | null | undefined) => {
+    if (!name) return "NA"
+    const parts = name.trim().split(/\s+/)
+    if (parts.length === 1) return parts[0][0]?.toUpperCase() || "NA"
+    return `${parts[0][0] || ""}${parts[parts.length - 1][0] || ""}`.toUpperCase()
+  }
+
+  const uploadAvatar = async (file: File) => {
+    setIsUploadingAvatar(true)
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      const safeName = file.name.replace(/\s+/g, "-")
+      const path = `artists/${user?.id || "user"}/${Date.now()}-${safeName}`
+
+      const { error } = await supabase.storage.from("portfolio-images").upload(path, file, {
+        upsert: true,
+        contentType: file.type,
+      })
+      if (error) throw error
+
+      const { data } = supabase.storage.from("portfolio-images").getPublicUrl(path)
+      setFormData({ ...formData, avatar_url: data.publicUrl })
+    } catch (error) {
+      console.error("Failed to upload avatar", error)
+    } finally {
+      setIsUploadingAvatar(false)
+    }
+  }
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -171,7 +204,7 @@ export default function ArtistsClient({ artists: initialArtists }: ArtistsClient
 
   return (
     <div className="flex flex-1 flex-col gap-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Artists</h1>
           <p className="text-muted-foreground">Manage your tattoo artists and their profiles</p>
@@ -189,7 +222,7 @@ export default function ArtistsClient({ artists: initialArtists }: ArtistsClient
               <DialogDescription>Add a new tattoo artist to your shop.</DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="grid gap-2">
                   <Label htmlFor="name">Full Name *</Label>
                   <Input
@@ -210,7 +243,28 @@ export default function ArtistsClient({ artists: initialArtists }: ArtistsClient
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label>Profile Photo</Label>
+                <div className="flex items-center gap-4">
+                  <Avatar className="h-12 w-12">
+                    <AvatarImage src={formData.avatar_url || undefined} />
+                    <AvatarFallback>{getInitials(formData.name)}</AvatarFallback>
+                  </Avatar>
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    disabled={isUploadingAvatar}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) {
+                        uploadAvatar(file)
+                      }
+                    }}
+                  />
+                </div>
+                {isUploadingAvatar && <p className="text-xs text-muted-foreground">Uploading...</p>}
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="grid gap-2">
                   <Label htmlFor="phone">Phone</Label>
                   <Input
@@ -232,7 +286,7 @@ export default function ArtistsClient({ artists: initialArtists }: ArtistsClient
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="grid gap-2">
                   <Label htmlFor="experience">Years of Experience</Label>
                   <Input
@@ -312,7 +366,7 @@ export default function ArtistsClient({ artists: initialArtists }: ArtistsClient
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-2">
@@ -365,7 +419,7 @@ export default function ArtistsClient({ artists: initialArtists }: ArtistsClient
       </div>
 
       {/* Artists Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
         {(artists || []).map((artist) => (
           <Card key={artist.id} className="relative overflow-hidden hover:shadow-lg transition-shadow">
             <CardHeader className="pb-3">
@@ -373,13 +427,8 @@ export default function ArtistsClient({ artists: initialArtists }: ArtistsClient
                 <div className="flex items-center gap-3">
                   <div className="relative">
                     <Avatar className="h-16 w-16">
-                      <AvatarImage src={artist.profileImage || "/placeholder.svg"} />
-                      <AvatarFallback className="text-lg">
-                        {(artist.name || "A")
-                          .split(" ")
-                          .map((n) => n[0])
-                          .join("")}
-                      </AvatarFallback>
+                      <AvatarImage src={artist.avatar_url || undefined} />
+                      <AvatarFallback className="text-lg">{getInitials(artist.name)}</AvatarFallback>
                     </Avatar>
                     <div
                       className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-white ${
@@ -547,7 +596,7 @@ export default function ArtistsClient({ artists: initialArtists }: ArtistsClient
             <DialogDescription>Update artist information and settings.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
                 <Label htmlFor="edit-name">Full Name *</Label>
                 <Input
@@ -568,7 +617,28 @@ export default function ArtistsClient({ artists: initialArtists }: ArtistsClient
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-2">
+              <Label>Profile Photo</Label>
+              <div className="flex items-center gap-4">
+                <Avatar className="h-12 w-12">
+                  <AvatarImage src={formData.avatar_url || undefined} />
+                  <AvatarFallback>{getInitials(formData.name)}</AvatarFallback>
+                </Avatar>
+                <Input
+                  type="file"
+                  accept="image/*"
+                  disabled={isUploadingAvatar}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) {
+                      uploadAvatar(file)
+                    }
+                  }}
+                />
+              </div>
+              {isUploadingAvatar && <p className="text-xs text-muted-foreground">Uploading...</p>}
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
                 <Label htmlFor="edit-phone">Phone</Label>
                 <Input
@@ -590,7 +660,7 @@ export default function ArtistsClient({ artists: initialArtists }: ArtistsClient
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
                 <Label htmlFor="edit-experience">Years of Experience</Label>
                 <Input

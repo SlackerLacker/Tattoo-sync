@@ -195,11 +195,11 @@ export default function ClientDashboard() {
       {/* Header */}
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between py-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between py-4">
             <div className="flex items-center">
               <h1 className="text-2xl font-bold text-gray-900">{shopInfo.name}</h1>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex flex-wrap items-center gap-2">
               <Link href="/client/messages">
                 <Button variant="outline" size="sm">
                   <MessageSquare className="h-4 w-4 mr-2" />
@@ -230,7 +230,7 @@ export default function ClientDashboard() {
         </div>
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center gap-2">
@@ -275,7 +275,7 @@ export default function ClientDashboard() {
             {/* Book New Appointment */}
             <Card className="mb-8 bg-gradient-to-r from-purple-500 to-pink-500 text-white">
               <CardContent className="p-6">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h3 className="text-xl font-bold mb-2">Ready for your next tattoo?</h3>
                     <p className="opacity-90">Book with one of our amazing artists today!</p>
@@ -320,7 +320,7 @@ export default function ClientDashboard() {
                             onChange={(e) => setBookingData({ ...bookingData, service: e.target.value })}
                           />
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid gap-4 sm:grid-cols-2">
                           <div className="grid gap-2">
                             <Label htmlFor="date">Preferred Date</Label>
                             <Input
@@ -377,20 +377,20 @@ export default function ClientDashboard() {
 
             {/* Artists Section */}
             <div className="mb-8">
-              <div className="flex items-center justify-between mb-6">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
                 <h3 className="text-2xl font-bold text-gray-900">Our Artists</h3>
-                <div className="flex items-center gap-4">
-                  <div className="relative">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <div className="relative w-full sm:w-64">
                     <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
                     <Input
                       placeholder="Search artists..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-8 w-64"
+                      className="pl-8 w-full"
                     />
                   </div>
                   <Select value={selectedSpecialty} onValueChange={setSelectedSpecialty}>
-                    <SelectTrigger className="w-40">
+                    <SelectTrigger className="w-full sm:w-40">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -422,7 +422,7 @@ export default function ClientDashboard() {
                       </div>
                     </div>
                     <CardContent className="p-4">
-                      <div className="flex items-center justify-between mb-2">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-2">
                         <h4 className="text-lg font-bold">{artist.name}</h4>
                         <div className="flex items-center gap-1">
                           <Star className="h-4 w-4 text-yellow-500 fill-current" />
@@ -430,7 +430,7 @@ export default function ClientDashboard() {
                           <span className="text-sm text-gray-500">({artist.reviews})</span>
                         </div>
                       </div>
-                      <div className="flex items-center justify-between mb-3">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-3">
                         <Badge variant="secondary">{artist.specialty}</Badge>
                         <span className="text-sm font-medium text-green-600">${artist.hourlyRate}/hr</span>
                       </div>
@@ -606,7 +606,7 @@ export default function ClientDashboard() {
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4">
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
                   {selectedArtist.portfolio.map((image: string, index: number) => (
                     <img
                       key={index}

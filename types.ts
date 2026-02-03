@@ -80,6 +80,7 @@ export interface Artist {
   name: string
   email: string
   phone: string
+  avatar_url?: string
   specialty: string[]
   experience: string
   status: "active" | "on-leave" | "inactive"
@@ -104,6 +105,7 @@ export interface Client {
   full_name: string
   email: string
   phone: string
+  avatar_url?: string
   totalAppointments: number
   totalSpent: number
   lastAppointment: string

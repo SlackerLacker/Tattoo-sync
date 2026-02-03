@@ -165,7 +165,7 @@ export default function SocialPage() {
   }
 
   return (
-    <div className="flex-1 space-y-6 p-6">
+    <div className="flex-1 space-y-6 p-4 sm:p-6">
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Social Media</h1>
@@ -173,7 +173,7 @@ export default function SocialPage() {
       </div>
 
       {/* Overview Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Followers</CardTitle>
@@ -223,7 +223,7 @@ export default function SocialPage() {
       </div>
 
       <Tabs defaultValue="accounts" className="space-y-4">
-        <TabsList>
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
           <TabsTrigger value="accounts">Accounts</TabsTrigger>
           <TabsTrigger value="create">Create Post</TabsTrigger>
           <TabsTrigger value="posts">Recent Posts</TabsTrigger>
@@ -232,7 +232,7 @@ export default function SocialPage() {
 
         {/* Accounts Tab */}
         <TabsContent value="accounts" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
             {socialAccounts.map((account) => (
               <Card key={account.platform}>
                 <CardHeader>
@@ -254,7 +254,7 @@ export default function SocialPage() {
                 <CardContent>
                   {account.connected ? (
                     <div className="space-y-4">
-                      <div className="grid grid-cols-3 gap-4 text-center">
+                      <div className="grid grid-cols-1 gap-3 text-center sm:grid-cols-3">
                         <div>
                           <div className="text-2xl font-bold">{account.followers.toLocaleString()}</div>
                           <div className="text-xs text-muted-foreground">Followers</div>
@@ -327,7 +327,7 @@ export default function SocialPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="schedule">Schedule Post (Optional)</Label>
                   <Input
@@ -352,7 +352,7 @@ export default function SocialPage() {
                 </div>
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row">
                 <Button
                   onClick={handlePost}
                   disabled={!postContent.trim() || selectedPlatforms.length === 0 || isPosting}
@@ -389,7 +389,7 @@ export default function SocialPage() {
               return (
                 <Card key={post.id}>
                   <CardContent className="p-4">
-                    <div className="flex space-x-4">
+                    <div className="flex flex-col gap-4 sm:flex-row">
                       <div className="flex-shrink-0">
                         <img
                           src={post.image || "/placeholder.svg"}
@@ -436,7 +436,7 @@ export default function SocialPage() {
 
         {/* Analytics Tab */}
         <TabsContent value="analytics" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
             {connectedAccounts.map((account) => (
               <Card key={account.platform}>
                 <CardHeader>
@@ -452,7 +452,7 @@ export default function SocialPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-4 sm:grid-cols-2">
                       <div className="text-center">
                         <div className="text-2xl font-bold text-green-600">+{Math.floor(Math.random() * 500)}</div>
                         <div className="text-xs text-muted-foreground">New Followers</div>
@@ -474,7 +474,7 @@ export default function SocialPage() {
                         ></div>
                       </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                    <div className="grid grid-cols-1 gap-2 text-center text-xs sm:grid-cols-3">
                       <div>
                         <div className="font-medium">{Math.floor(Math.random() * 1000)}</div>
                         <div className="text-muted-foreground">Likes</div>

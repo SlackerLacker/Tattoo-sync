@@ -265,7 +265,7 @@ export default function ServicesClient({ services: initialServices }: ServicesCl
 
   return (
     <div className="flex flex-1 flex-col gap-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Services & Products</h1>
           <p className="text-muted-foreground">Manage your tattoo services, pricing, and products</p>
@@ -279,8 +279,8 @@ export default function ServicesClient({ services: initialServices }: ServicesCl
         </TabsList>
 
         <TabsContent value="services" className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="grid gap-4 md:grid-cols-4 flex-1 mr-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 flex-1 sm:mr-4">
               <Card>
                 <CardContent className="p-4">
                   <div className="flex items-center gap-2">
@@ -349,7 +349,7 @@ export default function ServicesClient({ services: initialServices }: ServicesCl
                       onChange={(e) => setServiceFormData({ ...serviceFormData, description: e.target.value })}
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
                     <div className="grid gap-2">
                       <Label htmlFor="service-category">Category *</Label>
                       <Select
@@ -406,7 +406,7 @@ export default function ServicesClient({ services: initialServices }: ServicesCl
             </Dialog>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {services.map((service) => (
               <Card key={service.id}>
                 <CardHeader className="pb-3">
@@ -457,8 +457,8 @@ export default function ServicesClient({ services: initialServices }: ServicesCl
         </TabsContent>
 
         <TabsContent value="products" className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="grid gap-4 md:grid-cols-4 flex-1 mr-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 flex-1 sm:mr-4">
               <Card>
                 <CardContent className="p-4">
                   <div className="flex items-center gap-2">
@@ -529,7 +529,7 @@ export default function ServicesClient({ services: initialServices }: ServicesCl
                       onChange={(e) => setProductFormData({ ...productFormData, description: e.target.value })}
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
                     <div className="grid gap-2">
                       <Label htmlFor="product-category">Category *</Label>
                       <Select
@@ -559,7 +559,7 @@ export default function ServicesClient({ services: initialServices }: ServicesCl
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
                     <div className="grid gap-2">
                       <Label htmlFor="product-price">Price ($) *</Label>
                       <Input
@@ -596,7 +596,7 @@ export default function ServicesClient({ services: initialServices }: ServicesCl
             </Dialog>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {products.map((product) => (
               <Card key={product.id}>
                 <CardHeader className="pb-3">
@@ -681,7 +681,7 @@ export default function ServicesClient({ services: initialServices }: ServicesCl
                 onChange={(e) => setServiceFormData({ ...serviceFormData, description: e.target.value })}
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
                 <Label htmlFor="edit-service-category">Category *</Label>
                 <Select
@@ -712,7 +712,7 @@ export default function ServicesClient({ services: initialServices }: ServicesCl
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
                 <Label htmlFor="edit-service-duration">Duration (hours)</Label>
                 <Input
@@ -763,7 +763,7 @@ export default function ServicesClient({ services: initialServices }: ServicesCl
                 onChange={(e) => setProductFormData({ ...productFormData, description: e.target.value })}
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
                 <Label htmlFor="edit-product-category">Category *</Label>
                 <Select
@@ -793,7 +793,7 @@ export default function ServicesClient({ services: initialServices }: ServicesCl
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
                 <Label htmlFor="edit-product-price">Price ($) *</Label>
                 <Input

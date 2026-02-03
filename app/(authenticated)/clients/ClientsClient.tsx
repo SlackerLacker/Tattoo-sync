@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -31,15 +31,20 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Client } from "@/types"
+import { supabase } from "@/lib/supabase-browser"
 
 interface ClientsClientProps {
   clients: Client[]
 }
 
-const artists = ["Mike Rodriguez", "Luna Martinez", "Jake Thompson", "Sarah Kim"]
+type ArtistOption = {
+  id: string
+  name: string
+}
 
 export default function ClientsClient({ clients: initialClients }: ClientsClientProps) {
   const [clients, setClients] = useState<Client[]>(initialClients)
+  const [artistOptions, setArtistOptions] = useState<ArtistOption[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -47,6 +52,53 @@ export default function ClientsClient({ clients: initialClients }: ClientsClient
   const [selectedClient, setSelectedClient] = useState<Client | null>(null)
   const [formData, setFormData] = useState<Partial<Client>>({})
   const [formError, setFormError] = useState<string | null>(null)
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
+
+  useEffect(() => {
+    const fetchArtists = async () => {
+      try {
+        const res = await fetch("/api/artists")
+        if (!res.ok) return
+        const data = await res.json()
+        setArtistOptions((data || []).map((artist: any) => ({ id: artist.id, name: artist.name })))
+      } catch (error) {
+        console.error("Error fetching artists:", error)
+      }
+    }
+
+    fetchArtists()
+  }, [])
+
+  const getInitials = (name: string | null | undefined) => {
+    if (!name) return "NA"
+    const parts = name.trim().split(/\s+/)
+    if (parts.length === 1) return parts[0][0]?.toUpperCase() || "NA"
+    return `${parts[0][0] || ""}${parts[parts.length - 1][0] || ""}`.toUpperCase()
+  }
+
+  const uploadAvatar = async (file: File) => {
+    setIsUploadingAvatar(true)
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      const safeName = file.name.replace(/\s+/g, "-")
+      const path = `clients/${user?.id || "user"}/${Date.now()}-${safeName}`
+
+      const { error } = await supabase.storage.from("portfolio-images").upload(path, file, {
+        upsert: true,
+        contentType: file.type,
+      })
+      if (error) throw error
+
+      const { data } = supabase.storage.from("portfolio-images").getPublicUrl(path)
+      setFormData({ ...formData, avatar_url: data.publicUrl })
+    } catch (error) {
+      console.error("Failed to upload avatar", error)
+    } finally {
+      setIsUploadingAvatar(false)
+    }
+  }
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -59,6 +111,12 @@ export default function ClientsClient({ clients: initialClients }: ClientsClient
       default:
         return "bg-gray-100 text-gray-800"
     }
+  }
+
+  const getPreferredArtistName = (artistId?: string | null) => {
+    if (!artistId) return "No preference"
+    const match = artistOptions.find((artist) => artist.id === artistId)
+    return match?.name || "No preference"
   }
 
   const filteredClients = (clients || []).filter(
@@ -84,7 +142,8 @@ export default function ClientsClient({ clients: initialClients }: ClientsClient
           body: JSON.stringify(formData),
         })
         if (response.ok) {
-          const newClient = await response.json()
+          const data = await response.json()
+          const newClient = data?.client ?? data
           setClients([...(clients || []), newClient])
           setIsAddDialogOpen(false)
           resetForm()
@@ -155,7 +214,7 @@ export default function ClientsClient({ clients: initialClients }: ClientsClient
 
   return (
     <div className="flex flex-1 flex-col gap-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Clients</h1>
           <p className="text-muted-foreground">Manage your client database and information</p>
@@ -181,7 +240,7 @@ export default function ClientsClient({ clients: initialClients }: ClientsClient
               <DialogDescription>Add a new client to your database.</DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="grid gap-2">
                   <Label htmlFor="name">Full Name *</Label>
                   <Input
@@ -202,7 +261,28 @@ export default function ClientsClient({ clients: initialClients }: ClientsClient
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label>Profile Photo</Label>
+                <div className="flex items-center gap-4">
+                  <Avatar className="h-12 w-12">
+                    <AvatarImage src={formData.avatar_url || undefined} />
+                    <AvatarFallback>{getInitials(formData.full_name)}</AvatarFallback>
+                  </Avatar>
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    disabled={isUploadingAvatar}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) {
+                        uploadAvatar(file)
+                      }
+                    }}
+                  />
+                </div>
+                {isUploadingAvatar && <p className="text-xs text-muted-foreground">Uploading...</p>}
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="grid gap-2">
                   <Label htmlFor="phone">Phone</Label>
                   <Input
@@ -242,9 +322,9 @@ export default function ClientsClient({ clients: initialClients }: ClientsClient
                     <SelectValue placeholder="Select preferred artist" />
                   </SelectTrigger>
                   <SelectContent>
-                    {artists.map((artist) => (
-                      <SelectItem key={artist} value={artist}>
-                        {artist}
+                    {artistOptions.map((artist) => (
+                      <SelectItem key={artist.id} value={artist.id}>
+                        {artist.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -272,7 +352,7 @@ export default function ClientsClient({ clients: initialClients }: ClientsClient
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-2">
@@ -318,8 +398,8 @@ export default function ClientsClient({ clients: initialClients }: ClientsClient
       </div>
 
       {/* Search and Filters */}
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-sm">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+        <div className="relative flex-1 sm:max-w-sm">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search clients..."
@@ -338,28 +418,18 @@ export default function ClientsClient({ clients: initialClients }: ClientsClient
         {filteredClients.map((client) => (
           <Card key={client.id}>
             <CardContent className="p-6">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-4">
                   <Avatar className="h-12 w-12">
-                    <AvatarImage
-                      src={`/placeholder.svg?height=48&width=48&text=${client.full_name
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")}`}
-                    />
-                    <AvatarFallback>
-                      {client.full_name
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")}
-                    </AvatarFallback>
+                    <AvatarImage src={client.avatar_url || undefined} />
+                    <AvatarFallback>{getInitials(client.full_name)}</AvatarFallback>
                   </Avatar>
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <h3 className="font-semibold">{client.full_name}</h3>
                       <Badge className={getStatusColor(client.status || "new")}>{client.status || "new"}</Badge>
                     </div>
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                    <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                       <div className="flex items-center gap-1">
                         <Mail className="h-3 w-3" />
                         {client.email}
@@ -375,10 +445,10 @@ export default function ClientsClient({ clients: initialClients }: ClientsClient
                         </div>
                       )}
                     </div>
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                    <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                       <div className="flex items-center gap-1">
                         <User className="h-3 w-3" />
-                        Prefers: {client.preferredArtist || "No preference"}
+                        Prefers: {getPreferredArtistName(client.preferredArtist)}
                       </div>
                       <div className="flex items-center gap-1">
                         <Calendar className="h-3 w-3" />
@@ -387,8 +457,8 @@ export default function ClientsClient({ clients: initialClients }: ClientsClient
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-4">
-                  <div className="text-right">
+                <div className="flex items-center gap-4 sm:self-start">
+                  <div className="sm:text-right">
                     <p className="text-sm font-medium">{client.totalAppointments || 0} appointments</p>
                     <p className="text-xs text-muted-foreground">
                       Spent: ${(client.totalSpent || 0).toLocaleString()}
@@ -460,7 +530,7 @@ export default function ClientsClient({ clients: initialClients }: ClientsClient
             <DialogDescription>Update client information and preferences.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
                 <Label htmlFor="edit-name">Full Name *</Label>
                 <Input
@@ -481,7 +551,28 @@ export default function ClientsClient({ clients: initialClients }: ClientsClient
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-2">
+              <Label>Profile Photo</Label>
+              <div className="flex items-center gap-4">
+                <Avatar className="h-12 w-12">
+                  <AvatarImage src={formData.avatar_url || undefined} />
+                  <AvatarFallback>{getInitials(formData.full_name)}</AvatarFallback>
+                </Avatar>
+                <Input
+                  type="file"
+                  accept="image/*"
+                  disabled={isUploadingAvatar}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) {
+                      uploadAvatar(file)
+                    }
+                  }}
+                />
+              </div>
+              {isUploadingAvatar && <p className="text-xs text-muted-foreground">Uploading...</p>}
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
                 <Label htmlFor="edit-phone">Phone</Label>
                 <Input
@@ -511,7 +602,7 @@ export default function ClientsClient({ clients: initialClients }: ClientsClient
                 onChange={(e) => setFormData({ ...formData, address: e.target.value })}
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
                 <Label htmlFor="edit-preferredArtist">Preferred Artist</Label>
                 <Select
@@ -522,9 +613,9 @@ export default function ClientsClient({ clients: initialClients }: ClientsClient
                     <SelectValue placeholder="Select preferred artist" />
                   </SelectTrigger>
                   <SelectContent>
-                    {artists.map((artist) => (
-                      <SelectItem key={artist} value={artist}>
-                        {artist}
+                    {artistOptions.map((artist) => (
+                      <SelectItem key={artist.id} value={artist.id}>
+                        {artist.name}
                       </SelectItem>
                     ))}
                   </SelectContent>

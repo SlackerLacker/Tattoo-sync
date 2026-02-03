@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useMemo, useCallback } from "react"
+import { useState, useMemo, useCallback, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -133,6 +133,24 @@ const decimalToTimeString = (decimal: number): string => {
   return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`
 }
 
+const getLocalDateString = (date: Date): string => {
+  const year = date.getFullYear()
+  const month = `${date.getMonth() + 1}`.padStart(2, "0")
+  const day = `${date.getDate()}`.padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
+const parseLocalDateString = (dateString: string): Date => {
+  if (!dateString) return new Date(NaN)
+  const [ymd] = dateString.split("T")
+  const parts = ymd.split("-").map(Number)
+  if (parts.length !== 3 || parts.some((p) => Number.isNaN(p))) {
+    return new Date(dateString)
+  }
+  const [year, month, day] = parts
+  return new Date(year, month - 1, day)
+}
+
 export default function ScheduleClient({
   serverArtists,
   serverServices,
@@ -183,6 +201,8 @@ export default function ScheduleClient({
   const [isDraggingAppointment, setIsDraggingAppointment] = useState(false)
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null)
   const [dragOverSlot, setDragOverSlot] = useState<{ artistId: string; time: number } | null>(null)
+  const [isMobile, setIsMobile] = useState(false)
+  const [mobileArtistId, setMobileArtistId] = useState<string>("")
 
   // Get day of week for current date
   const getDayOfWeek = (date: Date) => {
@@ -236,6 +256,26 @@ export default function ScheduleClient({
   const workingHours = getWorkingHours(currentDate)
   const timeSlots = getTimeSlots(currentDate)
 
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 768px)")
+    const handleChange = () => setIsMobile(mediaQuery.matches)
+    handleChange()
+    mediaQuery.addEventListener("change", handleChange)
+    return () => mediaQuery.removeEventListener("change", handleChange)
+  }, [])
+
+  useEffect(() => {
+    if (!artists.length) return
+    if (mobileArtistId) return
+    setMobileArtistId(artists[0].id)
+  }, [artists, mobileArtistId])
+
+  const visibleArtists = useMemo(() => {
+    if (!isMobile) return artists
+    const selected = artists.find((artist) => artist.id === mobileArtistId)
+    return selected ? [selected] : artists.slice(0, 1)
+  }, [artists, isMobile, mobileArtistId])
+
   // Check if artist is available at specific time
   // This is a simplified check. A more robust solution would involve checking artist-specific schedules.
   const isArtistAvailable = (artistId: string, time: number, date: Date) => {
@@ -272,7 +312,7 @@ export default function ScheduleClient({
   const getAppointmentsStartingInSlot = (artistId: string, time: number) => {
     return appointments.filter((apt) => {
       if (!apt.appointment_date) return false
-      const aptDate = new Date(apt.appointment_date)
+      const aptDate = parseLocalDateString(apt.appointment_date)
 
       const isSameDay =
         aptDate.getFullYear() === currentDate.getFullYear() &&
@@ -287,7 +327,7 @@ export default function ScheduleClient({
   }
 
   const isAvailable = (artistId: string, time: number) => {
-    const currentDateStr = currentDate.toISOString().split("T")[0]
+    const currentDateStr = getLocalDateString(currentDate)
 
     if (!isShopOpen(time, currentDate) || !isArtistAvailable(artistId, time, currentDate)) return false
 
@@ -307,7 +347,7 @@ export default function ScheduleClient({
   }
 
   const getSlotStatus = (artistId: string, time: number) => {
-    const currentDateStr = currentDate.toISOString().split("T")[0]
+    const currentDateStr = getLocalDateString(currentDate)
 
     const appointment = appointments.find((apt) => {
       if (!apt.appointment_date) return false
@@ -347,7 +387,7 @@ export default function ScheduleClient({
   }
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
+    const date = parseLocalDateString(dateString)
     return date.toLocaleDateString("en-US", {
       weekday: "short",
       month: "short",
@@ -463,18 +503,36 @@ export default function ScheduleClient({
   }
 
   // Drag selection handlers
-  const handleMouseDown = useCallback((artistId: string, time: number, event: React.MouseEvent) => {
-    if (!isAvailable(artistId, time)) return
+  const startDragSelection = useCallback(
+    (artistId: string, time: number) => {
+      if (!isAvailable(artistId, time)) return
 
-    event.preventDefault()
-    setDragSelection({
-      isDragging: true,
-      artistId,
-      startTime: time,
-      endTime: time,
-      currentTime: time,
-    })
-  }, [])
+      setDragSelection({
+        isDragging: true,
+        artistId,
+        startTime: time,
+        endTime: time,
+        currentTime: time,
+      })
+    },
+    [isAvailable],
+  )
+
+  const handleMouseDown = useCallback(
+    (artistId: string, time: number, event: React.MouseEvent) => {
+      event.preventDefault()
+      startDragSelection(artistId, time)
+    },
+    [startDragSelection],
+  )
+
+  const handleTouchStart = useCallback(
+    (artistId: string, time: number, event: React.TouchEvent) => {
+      event.preventDefault()
+      startDragSelection(artistId, time)
+    },
+    [startDragSelection],
+  )
 
   const handleMouseEnter = useCallback(
     (artistId: string, time: number) => {
@@ -501,7 +559,7 @@ export default function ScheduleClient({
         .every((slot) => isAvailable(dragSelection.artistId!, slot))
 
       if (allSlotsAvailable && dragSelection.artistId) {
-        const currentDateStr = currentDate.toISOString().split("T")[0]
+        const currentDateStr = getLocalDateString(currentDate)
         const durationValue = duration * 60
         setFormData({
           artist_id: dragSelection.artistId,
@@ -522,7 +580,54 @@ export default function ScheduleClient({
       endTime: null,
       currentTime: null,
     })
-  }, [dragSelection, timeSlots, currentDate])
+  }, [calculatePrice, currentDate, dragSelection, isAvailable, timeSlots])
+
+  useEffect(() => {
+    if (!dragSelection.isDragging) return
+
+    const handleMoveFromPoint = (clientX: number, clientY: number) => {
+      const target = document.elementFromPoint(clientX, clientY) as HTMLElement | null
+      const slot = target?.closest("[data-slot='true']") as HTMLElement | null
+      if (!slot) return
+
+      const artistId = slot.dataset.artistId
+      const timeValue = slot.dataset.time
+      if (!artistId || !timeValue) return
+
+      const time = Number.parseFloat(timeValue)
+      if (Number.isNaN(time)) return
+
+      handleMouseEnter(artistId, time)
+    }
+
+    const handleMouseMove = (event: MouseEvent) => {
+      handleMoveFromPoint(event.clientX, event.clientY)
+    }
+
+    const handleTouchMove = (event: TouchEvent) => {
+      if (event.touches.length === 0) return
+      const touch = event.touches[0]
+      handleMoveFromPoint(touch.clientX, touch.clientY)
+    }
+
+    const handleUp = () => {
+      handleMouseUp()
+    }
+
+    window.addEventListener("mousemove", handleMouseMove)
+    window.addEventListener("mouseup", handleUp)
+    window.addEventListener("touchmove", handleTouchMove, { passive: false })
+    window.addEventListener("touchend", handleUp)
+    window.addEventListener("touchcancel", handleUp)
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove)
+      window.removeEventListener("mouseup", handleUp)
+      window.removeEventListener("touchmove", handleTouchMove)
+      window.removeEventListener("touchend", handleUp)
+      window.removeEventListener("touchcancel", handleUp)
+    }
+  }, [dragSelection.isDragging, handleMouseEnter, handleMouseUp])
 
   // Add these new functions after the existing drag selection handlers
   const handleAppointmentDragStart = useCallback((appointment: Appointment, event: React.DragEvent) => {
@@ -559,7 +664,7 @@ export default function ScheduleClient({
 
       if (!draggedAppointment || !isDraggingAppointment) return
 
-      const currentDateStr = currentDate.toISOString().split("T")[0]
+      const currentDateStr = getLocalDateString(currentDate)
       const appointmentDurationHours = (draggedAppointment.duration || 60) / 60
       const appointmentEndTime = time + appointmentDurationHours
       const slotsNeeded = []
@@ -573,7 +678,7 @@ export default function ScheduleClient({
         }
         const hasConflict = appointments.some(
           (apt) => {
-            const aptDate = new Date(apt.appointment_date)
+            const aptDate = parseLocalDateString(apt.appointment_date)
             const isSameDay =
               aptDate.getFullYear() === currentDate.getFullYear() &&
               aptDate.getMonth() === currentDate.getMonth() &&
@@ -665,7 +770,7 @@ export default function ScheduleClient({
 
   const handleSlotClick = (artistId: string, time: number) => {
     if (isAvailable(artistId, time)) {
-      const currentDateStr = currentDate.toISOString().split("T")[0]
+      const currentDateStr = getLocalDateString(currentDate)
       const duration = 60
       setFormData({
         artist_id: artistId,
@@ -682,7 +787,7 @@ export default function ScheduleClient({
   const handleNewAppointment = () => {
     setFormData({
       status: "confirmed",
-      appointment_date: currentDate.toISOString().split("T")[0],
+      appointment_date: getLocalDateString(currentDate),
       start_time: "09:00:00",
       duration: 60,
     })
@@ -1070,23 +1175,27 @@ export default function ScheduleClient({
 
       switch (dateFilter) {
         case "today":
-          filtered = filtered.filter((apt) => new Date(apt.appointment_date).toDateString() === today.toDateString())
+          filtered = filtered.filter(
+            (apt) => parseLocalDateString(apt.appointment_date).toDateString() === today.toDateString(),
+          )
           break
         case "tomorrow":
           filtered = filtered.filter(
-            (apt) => new Date(apt.appointment_date).toDateString() === tomorrow.toDateString(),
+            (apt) => parseLocalDateString(apt.appointment_date).toDateString() === tomorrow.toDateString(),
           )
           break
         case "week":
           filtered = filtered.filter(
-            (apt) => new Date(apt.appointment_date) >= weekStart && new Date(apt.appointment_date) <= weekEnd,
+            (apt) =>
+              parseLocalDateString(apt.appointment_date) >= weekStart &&
+              parseLocalDateString(apt.appointment_date) <= weekEnd,
           )
           break
         case "upcoming":
-          filtered = filtered.filter((apt) => new Date(apt.appointment_date) >= today)
+          filtered = filtered.filter((apt) => parseLocalDateString(apt.appointment_date) >= today)
           break
         case "past":
-          filtered = filtered.filter((apt) => new Date(apt.appointment_date) < today)
+          filtered = filtered.filter((apt) => parseLocalDateString(apt.appointment_date) < today)
           break
         default:
           break
@@ -1102,13 +1211,13 @@ export default function ScheduleClient({
       viewMode === "calendar"
         ? isToday(currentDate)
           ? "Today"
-          : formatDate(currentDate.toISOString())
+          : formatDate(getLocalDateString(currentDate))
         : "Filtered List"
 
     const appointmentsForDate =
       viewMode === "calendar"
         ? data.filter((apt) => {
-          const aptDate = new Date(apt.appointment_date)
+          const aptDate = parseLocalDateString(apt.appointment_date)
           return (
             aptDate.getFullYear() === currentDate.getFullYear() &&
             aptDate.getMonth() === currentDate.getMonth() &&
@@ -1211,10 +1320,32 @@ export default function ScheduleClient({
           {/* Calendar Grid */}
           <Card className="flex-1">
             <CardContent className="p-0">
+              {isMobile && visibleArtists.length > 0 && (
+                <div className="px-4 py-3 border-b bg-gray-50">
+                  <Label className="text-xs text-gray-500">Artist</Label>
+                  <Select value={mobileArtistId} onValueChange={setMobileArtistId}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Select artist" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {artists.map((artist) => (
+                        <SelectItem key={artist.id} value={artist.id}>
+                          {artist.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               {/* Artist Headers */}
-              <div className="grid grid-cols-5 border-b">
+              <div
+                className="grid border-b"
+                style={{
+                  gridTemplateColumns: `minmax(84px, 96px) repeat(${visibleArtists.length}, minmax(180px, 1fr))`,
+                }}
+              >
                 <div className="p-4 border-r bg-gray-50 font-medium text-sm">Time</div>
-                {artists.map((artist) => (
+                {visibleArtists.map((artist) => (
                   <div key={artist.id} className="p-4 border-r last:border-r-0 bg-gray-50">
                     <div className="flex items-center gap-3">
                       <Avatar className="h-8 w-8">
@@ -1248,7 +1379,13 @@ export default function ScheduleClient({
               {/* Scrollable Time Slots */}
               <ScrollArea className="h-[600px]">
                 {workingHours.map((hour) => (
-                  <div key={hour} className="grid grid-cols-5 border-b last:border-b-0 min-h-[120px]">
+                  <div
+                    key={hour}
+                    className="grid border-b last:border-b-0 min-h-[120px]"
+                    style={{
+                      gridTemplateColumns: `minmax(84px, 96px) repeat(${visibleArtists.length}, minmax(180px, 1fr))`,
+                    }}
+                  >
                     {/* Time label */}
                     <div className="p-3 border-r bg-gray-50 flex items-start justify-center">
                       <div className="text-center">
@@ -1257,7 +1394,7 @@ export default function ScheduleClient({
                     </div>
 
                     {/* Artist columns */}
-                    {artists.map((artist) => (
+                    {visibleArtists.map((artist) => (
                       <div key={artist.id} className="border-r last:border-r-0 relative">
                         {/* 15-minute subdivisions */}
                         <div className="grid grid-rows-4 h-[120px]">
@@ -1272,7 +1409,7 @@ export default function ScheduleClient({
                             return (
                               <div
                                 key={quarterHour}
-                                className={`border-b last:border-b-0 p-1 transition-all cursor-pointer relative group ${getSlotBackgroundColor(
+                                className={`border-b last:border-b-0 p-1 transition-all cursor-pointer relative group touch-none ${getSlotBackgroundColor(
                                   slotStatus,
                                   isDragSelected,
                                   isTarget,
@@ -1281,12 +1418,16 @@ export default function ScheduleClient({
                                     ? "hover:bg-blue-100 hover:border-2 hover:border-blue-300"
                                     : ""
                                   }`}
+                                data-slot="true"
+                                data-artist-id={artist.id}
+                                data-time={time}
                                 onClick={() =>
                                   !dragSelection.isDragging &&
                                   !isDraggingAppointment &&
                                   handleSlotClick(artist.id, time)
                                 }
                                 onMouseDown={(e) => !isDraggingAppointment && handleMouseDown(artist.id, time, e)}
+                                onTouchStart={(e) => !isDraggingAppointment && handleTouchStart(artist.id, time, e)}
                                 onMouseEnter={() => !isDraggingAppointment && handleMouseEnter(artist.id, time)}
                                 onDragOver={(e) => handleSlotDragOver(artist.id, time, e)}
                                 onDragLeave={handleSlotDragLeave}
@@ -1346,7 +1487,8 @@ export default function ScheduleClient({
                                     key={appointment.id}
                                     className={`absolute inset-1 rounded-lg p-2 border shadow-sm overflow-hidden ${getStatusColor(
                                       appointment.status,
-                                    )} group cursor-move hover:shadow-md transition-all z-10 ${isDraggingAppointment && draggedAppointment?.id === appointment.id
+                                    )} group cursor-move hover:shadow-md transition-all z-10 ${dragSelection.isDragging ? "pointer-events-none" : ""
+                                      } ${isDraggingAppointment && draggedAppointment?.id === appointment.id
                                       ? "opacity-50 scale-105"
                                       : ""
                                       }`}
@@ -1592,7 +1734,7 @@ export default function ScheduleClient({
                 <div className="space-y-2 p-4">
                   {filteredAppointments.map((appointment) => {
                     const artist = getArtistById(appointment.artist_id)
-                    const appointmentDate = new Date(appointment.appointment_date)
+                    const appointmentDate = parseLocalDateString(appointment.appointment_date)
                     const isAppointmentToday = appointmentDate.toDateString() === new Date().toDateString()
                     const isPast = appointmentDate < new Date()
 

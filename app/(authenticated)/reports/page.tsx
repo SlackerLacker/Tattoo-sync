@@ -134,12 +134,12 @@ export default function ReportsPage() {
 
   return (
     <div className="flex flex-1 flex-col gap-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Reports & Analytics</h1>
           <p className="text-muted-foreground">Comprehensive insights into your shop's performance</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm">
             <Filter className="mr-2 h-4 w-4" />
             Filters
@@ -158,11 +158,11 @@ export default function ReportsPage() {
       {/* Date Range and Filters */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <div className="flex items-center gap-2">
               <label className="text-sm font-medium">Date Range:</label>
               <Select value={dateRange} onValueChange={setDateRange}>
-                <SelectTrigger className="w-[140px]">
+                <SelectTrigger className="w-full sm:w-[140px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -178,7 +178,7 @@ export default function ReportsPage() {
             <div className="flex items-center gap-2">
               <label className="text-sm font-medium">Artist:</label>
               <Select value={selectedArtist} onValueChange={setSelectedArtist}>
-                <SelectTrigger className="w-[160px]">
+                <SelectTrigger className="w-full sm:w-[160px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -195,7 +195,7 @@ export default function ReportsPage() {
       </Card>
 
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-2 gap-2 sm:grid-cols-5">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="revenue">Revenue</TabsTrigger>
           <TabsTrigger value="artists">Artists</TabsTrigger>
@@ -206,7 +206,7 @@ export default function ReportsPage() {
         {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-6">
           {/* Key Metrics */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
             <Card>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
@@ -307,7 +307,7 @@ export default function ReportsPage() {
 
         {/* Revenue Tab */}
         <TabsContent value="revenue" className="space-y-6">
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
             {/* Service Revenue Breakdown */}
             <Card>
               <CardHeader>
@@ -395,6 +395,37 @@ export default function ReportsPage() {
               </div>
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Service Performance Table</CardTitle>
+              <CardDescription>Scrollable table view for detailed comparison</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="min-w-[640px] w-full text-sm">
+                  <thead>
+                    <tr className="text-left border-b">
+                      <th className="py-2 pr-4 font-medium">Service</th>
+                      <th className="py-2 pr-4 font-medium">Sessions</th>
+                      <th className="py-2 pr-4 font-medium">Avg Price</th>
+                      <th className="py-2 pr-4 font-medium">Revenue</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {serviceRevenueData.map((service, index) => (
+                      <tr key={index} className="border-b last:border-b-0">
+                        <td className="py-2 pr-4">{service.service}</td>
+                        <td className="py-2 pr-4">{service.sessions}</td>
+                        <td className="py-2 pr-4">${service.avgPrice}</td>
+                        <td className="py-2 pr-4 font-medium">${service.revenue.toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Artists Tab */}
@@ -430,7 +461,7 @@ export default function ReportsPage() {
           </Card>
 
           {/* Artist Details */}
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
             {artistPerformanceData.map((artist, index) => (
               <Card key={index}>
                 <CardContent className="p-6">
@@ -446,7 +477,7 @@ export default function ReportsPage() {
                       <p className="text-sm text-muted-foreground">{artist.specialty} Specialist</p>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
                     <div>
                       <p className="text-sm text-muted-foreground">Revenue</p>
                       <p className="font-bold">${artist.revenue.toLocaleString()}</p>
@@ -482,7 +513,7 @@ export default function ReportsPage() {
               <CardDescription>Revenue and behavior by client type</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                 {clientSegmentData.map((segment, index) => (
                   <Card key={index}>
                     <CardContent className="p-6">
@@ -590,7 +621,7 @@ export default function ReportsPage() {
           </Card>
 
           {/* Operational KPIs */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
             <Card>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">

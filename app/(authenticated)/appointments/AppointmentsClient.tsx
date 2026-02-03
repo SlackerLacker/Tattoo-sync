@@ -278,7 +278,7 @@ export default function AppointmentsClient({
 
   return (
     <div className="flex flex-1 flex-col gap-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Appointments</h1>
           <p className="text-muted-foreground">View and manage all appointments</p>
@@ -292,7 +292,7 @@ export default function AppointmentsClient({
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-2">
@@ -334,7 +334,7 @@ export default function AppointmentsClient({
       {/* Filters */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex flex-wrap items-center gap-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
@@ -345,7 +345,7 @@ export default function AppointmentsClient({
               />
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[140px]">
+              <SelectTrigger className="w-full sm:w-[140px]">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
@@ -357,7 +357,7 @@ export default function AppointmentsClient({
               </SelectContent>
             </Select>
             <Select value={artistFilter} onValueChange={setArtistFilter}>
-              <SelectTrigger className="w-[160px]">
+              <SelectTrigger className="w-full sm:w-[160px]">
                 <SelectValue placeholder="Artist" />
               </SelectTrigger>
               <SelectContent>
@@ -370,7 +370,7 @@ export default function AppointmentsClient({
               </SelectContent>
             </Select>
             <Select value={dateFilter} onValueChange={setDateFilter}>
-              <SelectTrigger className="w-[140px]">
+              <SelectTrigger className="w-full sm:w-[140px]">
                 <SelectValue placeholder="Date" />
               </SelectTrigger>
               <SelectContent>
@@ -417,7 +417,7 @@ export default function AppointmentsClient({
                     className={`transition-colors hover:bg-gray-50 ${isToday ? "border-blue-200 bg-blue-50" : ""}`}
                   >
                     <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex items-center gap-4">
                           <Avatar className="h-10 w-10">
                             <AvatarImage src={`/placeholder.svg?height=40&width=40&text=${clientInitials}`} />
@@ -433,7 +433,7 @@ export default function AppointmentsClient({
                                 </Badge>
                               )}
                             </div>
-                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                            <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                               <div className="flex items-center gap-1">
                                 <User className="h-3 w-3" />
                                 {artistName}
@@ -459,7 +459,7 @@ export default function AppointmentsClient({
                             </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 sm:self-start">
                           {getStatusIcon(appointment.status)}
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -534,7 +534,7 @@ export default function AppointmentsClient({
           </DialogHeader>
           {selectedAppointment && (
             <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <Label className="text-sm font-medium text-muted-foreground">Client</Label>
                   <p className="text-sm font-semibold">{selectedAppointment.clients?.full_name}</p>
@@ -544,7 +544,7 @@ export default function AppointmentsClient({
                   <Badge className={getStatusColor(selectedAppointment.status)}>{selectedAppointment.status}</Badge>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <Label className="text-sm font-medium text-muted-foreground">Artist</Label>
                   <p className="text-sm">{selectedAppointment.artists?.name}</p>
@@ -554,7 +554,7 @@ export default function AppointmentsClient({
                   <p className="text-sm">{selectedAppointment.services?.name}</p>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <Label className="text-sm font-medium text-muted-foreground">Date</Label>
                   <p className="text-sm">{formatDate(selectedAppointment.appointment_date)}</p>
@@ -567,7 +567,7 @@ export default function AppointmentsClient({
                   </p>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <Label className="text-sm font-medium text-muted-foreground">Duration</Label>
                   <p className="text-sm">
@@ -581,7 +581,7 @@ export default function AppointmentsClient({
                 </div>
               </div>
               {selectedAppointment.deposit_paid && (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-4 sm:grid-cols-2">
                   <div>
                     <Label className="text-sm font-medium text-muted-foreground">Deposit Paid</Label>
                     <p className="text-sm">${selectedAppointment.deposit_paid}</p>
@@ -594,7 +594,7 @@ export default function AppointmentsClient({
                   </div>
                 </div>
               )}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <Label className="text-sm font-medium text-muted-foreground">Phone</Label>
                   <p className="text-sm">{selectedAppointment.clients?.phone}</p>
@@ -706,7 +706,7 @@ export default function AppointmentsClient({
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
                 <Label htmlFor="edit-date">Date</Label>
                 <Input
@@ -726,7 +726,7 @@ export default function AppointmentsClient({
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
                 <Label htmlFor="edit-price">Price ($)</Label>
                 <Input

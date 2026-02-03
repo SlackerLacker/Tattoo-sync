@@ -14,6 +14,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
   Store,
   Users,
   Bell,
@@ -39,22 +46,15 @@ const timeZones = [
 ]
 
 const roles = [
-  { value: "owner", label: "Owner", description: "Full access to all features" },
+  { value: "admin", label: "Owner/Admin", description: "Full access to all features" },
   { value: "artist", label: "Artist", description: "Manage own appointments and clients" },
-  { value: "receptionist", label: "Receptionist", description: "Manage appointments and basic client info" },
-]
-
-const users = [
-  { id: 1, name: "John Smith", email: "john@inkstudio.com", role: "owner", status: "active", avatar: "JS" },
-  { id: 2, name: "Mike Rodriguez", email: "mike@inkstudio.com", role: "artist", status: "active", avatar: "MR" },
-  { id: 3, name: "Luna Martinez", email: "luna@inkstudio.com", role: "artist", status: "active", avatar: "LM" },
-  { id: 4, name: "Sarah Kim", email: "sarah@inkstudio.com", role: "artist", status: "active", avatar: "SK" },
-  { id: 5, name: "Emma Wilson", email: "emma@inkstudio.com", role: "receptionist", status: "active", avatar: "EW" },
 ]
 
 export default function SettingsPage() {
   const [studio, setStudio] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [profile, setProfile] = useState<any>(null)
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
 
   const [activeTab, setActiveTab] = useState("shop")
   const [shopSettings, setShopSettings] = useState({
@@ -97,12 +97,15 @@ export default function SettingsPage() {
   const [notificationSettings, setNotificationSettings] = useState({
     emailEnabled: true,
     smsEnabled: true,
+    inAppEnabled: true,
     newBookings: true,
     cancellations: true,
     payments: true,
     reviews: true,
     reminders: true,
     reminderTime: 24,
+    notifyNewConversation: true,
+    notifyNewMessage: true,
   })
 
   const [paymentSettings, setPaymentSettings] = useState({
@@ -139,6 +142,59 @@ export default function SettingsPage() {
   })
 
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const [teamMembers, setTeamMembers] = useState<any[]>([])
+  const [availableArtists, setAvailableArtists] = useState<any[]>([])
+  const [isCreateUserOpen, setIsCreateUserOpen] = useState(false)
+  const [isConnectArtistOpen, setIsConnectArtistOpen] = useState(false)
+  const [pendingArtistId, setPendingArtistId] = useState<string | null>(null)
+  const [isEditMemberOpen, setIsEditMemberOpen] = useState(false)
+  const [isResetPasswordOpen, setIsResetPasswordOpen] = useState(false)
+  const [selectedMember, setSelectedMember] = useState<any>(null)
+  const [resetPasswordValue, setResetPasswordValue] = useState("")
+  const [connectProfileId, setConnectProfileId] = useState<string | null>(null)
+  const [connectArtistId, setConnectArtistId] = useState<string>("")
+  const [createUserData, setCreateUserData] = useState({
+    full_name: "",
+    email: "",
+    password: "",
+    role: "artist",
+  })
+
+  const fetchTeamMembers = async (studioId: string) => {
+    const { data: profiles, error: profilesError } = await supabase
+      .from("profiles")
+      .select("id, full_name, email, role, avatar_url")
+      .eq("studio_id", studioId)
+      .neq("role", "client")
+
+    if (profilesError) {
+      console.error("Error fetching team members:", profilesError?.message || profilesError)
+      return
+    }
+
+    const { data: artists, error: artistsError } = await supabase
+      .from("artists")
+      .select("id, name, user_id")
+      .eq("studio_id", studioId)
+
+    if (artistsError) {
+      console.error("Error fetching artists:", artistsError?.message || artistsError)
+      return
+    }
+
+    const artistByUserId = new Map(
+      (artists || []).filter((artist) => artist.user_id).map((artist) => [artist.user_id, artist]),
+    )
+
+    setAvailableArtists((artists || []).filter((artist) => !artist.user_id))
+
+    const members = (profiles || []).map((member) => ({
+      ...member,
+      artist: artistByUserId.get(member.id) || null,
+    }))
+
+    setTeamMembers(members)
+  }
 
   useEffect(() => {
     const fetchStudio = async () => {
@@ -147,11 +203,24 @@ export default function SettingsPage() {
         data: { user },
       } = await supabase.auth.getUser()
       if (user) {
-        const { data, error } = await supabase.from("studios").select("*").eq("owner_id", user.id).single()
-        if (error) {
-          console.error("Error fetching studio:", error)
+        const { data: profileData, error: profileError } = await supabase
+          .from("profiles")
+          .select("id, full_name, email, avatar_url, studio_id, role")
+          .eq("id", user.id)
+          .single()
+        if (profileError) {
+          console.error("Error fetching profile:", profileError?.message || profileError)
         } else {
-          setStudio(data)
+          setProfile(profileData)
+        }
+        if (profileData?.studio_id) {
+          const { data, error } = await supabase.from("studios").select("*").eq("id", profileData.studio_id).single()
+          if (error) {
+            console.error("Error fetching studio:", error?.message || error)
+          } else {
+            setStudio(data)
+          }
+          await fetchTeamMembers(profileData.studio_id)
         }
       }
       setLoading(false)
@@ -160,10 +229,197 @@ export default function SettingsPage() {
     fetchStudio()
   }, [])
 
-  const handleSave = () => {
-    console.log("Saving settings...")
-    setHasUnsavedChanges(false)
-    alert("Settings saved successfully!")
+  useEffect(() => {
+    const fetchNotificationSettings = async () => {
+      try {
+        const res = await fetch("/api/notification-settings")
+        if (!res.ok) return
+        const data = await res.json()
+        setNotificationSettings({
+          emailEnabled: !!data.email_enabled,
+          smsEnabled: !!data.sms_enabled,
+          inAppEnabled: !!data.in_app_enabled,
+          newBookings: !!data.new_bookings,
+          cancellations: !!data.cancellations,
+          payments: !!data.payments,
+          reviews: !!data.reviews,
+          reminders: !!data.reminders,
+          reminderTime: data.reminder_time ?? 24,
+          notifyNewConversation: !!data.notify_new_conversation,
+          notifyNewMessage: !!data.notify_new_message,
+        })
+      } catch (error) {
+        console.error("Error loading notification settings:", error)
+      }
+    }
+
+    fetchNotificationSettings()
+  }, [])
+
+  const getInitials = (name: string | null | undefined) => {
+    if (!name) return "NA"
+    const parts = name.trim().split(/\s+/)
+    if (parts.length === 1) return (parts[0][0] || "N").toUpperCase()
+    return `${parts[0][0] || ""}${parts[parts.length - 1][0] || ""}`.toUpperCase()
+  }
+
+  const uploadProfileAvatar = async (file: File) => {
+    setIsUploadingAvatar(true)
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) return
+
+      const safeName = file.name.replace(/\s+/g, "-")
+      const path = `profiles/${user.id}/${Date.now()}-${safeName}`
+
+      const { error } = await supabase.storage.from("portfolio-images").upload(path, file, {
+        upsert: true,
+        contentType: file.type,
+      })
+      if (error) throw error
+
+      const { data } = supabase.storage.from("portfolio-images").getPublicUrl(path)
+      const avatarUrl = data.publicUrl
+
+      const { error: updateError } = await supabase.from("profiles").update({ avatar_url: avatarUrl }).eq("id", user.id)
+      if (updateError) throw updateError
+
+      setProfile((prev: any) => ({ ...(prev || {}), avatar_url: avatarUrl }))
+    } catch (error) {
+      console.error("Failed to upload profile avatar", error)
+    } finally {
+      setIsUploadingAvatar(false)
+    }
+  }
+
+  const createUser = async () => {
+    if (!profile?.studio_id) return
+    const response = await fetch("/api/create-user", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: createUserData.email,
+        password: createUserData.password,
+        role: createUserData.role,
+        studio_id: profile.studio_id,
+        full_name: createUserData.full_name,
+      }),
+    })
+
+    if (response.ok) {
+      const { user } = await response.json()
+      if (pendingArtistId && user?.id) {
+        await fetch(`/api/artists/${pendingArtistId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user_id: user.id }),
+        })
+      }
+      setIsCreateUserOpen(false)
+      setPendingArtistId(null)
+      setCreateUserData({ full_name: "", email: "", password: "", role: "artist" })
+      await fetchTeamMembers(profile.studio_id)
+    } else {
+      const { error } = await response.json()
+      console.error("Failed to create user:", error)
+    }
+  }
+
+  const connectArtistToUser = async () => {
+    if (!connectProfileId || !connectArtistId) return
+    const response = await fetch(`/api/artists/${connectArtistId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: connectProfileId }),
+    })
+
+    if (response.ok && profile?.studio_id) {
+      setIsConnectArtistOpen(false)
+      setConnectProfileId(null)
+      setConnectArtistId("")
+      await fetchTeamMembers(profile.studio_id)
+    } else {
+      console.error("Failed to connect artist to user")
+    }
+  }
+
+  const openEditMember = (member: any) => {
+    setSelectedMember(member)
+    setIsEditMemberOpen(true)
+  }
+
+  const openResetPassword = (member: any) => {
+    setSelectedMember(member)
+    setResetPasswordValue("")
+    setIsResetPasswordOpen(true)
+  }
+
+  const saveMemberEdits = async () => {
+    if (!selectedMember) return
+    const response = await fetch(`/api/team-members/${selectedMember.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        full_name: selectedMember.full_name,
+        email: selectedMember.email,
+        role: selectedMember.role,
+      }),
+    })
+
+    if (response.ok && profile?.studio_id) {
+      setIsEditMemberOpen(false)
+      setSelectedMember(null)
+      await fetchTeamMembers(profile.studio_id)
+    } else {
+      const { error } = await response.json()
+      console.error("Failed to update member:", error)
+    }
+  }
+
+  const resetMemberPassword = async () => {
+    if (!selectedMember || !resetPasswordValue) return
+    const response = await fetch(`/api/team-members/${selectedMember.id}/reset-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: resetPasswordValue }),
+    })
+
+    if (response.ok) {
+      setIsResetPasswordOpen(false)
+      setSelectedMember(null)
+      setResetPasswordValue("")
+    } else {
+      const { error } = await response.json()
+      console.error("Failed to reset password:", error)
+    }
+  }
+
+  const handleSave = async () => {
+    try {
+      await fetch("/api/notification-settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email_enabled: notificationSettings.emailEnabled,
+          sms_enabled: notificationSettings.smsEnabled,
+          in_app_enabled: notificationSettings.inAppEnabled,
+          new_bookings: notificationSettings.newBookings,
+          cancellations: notificationSettings.cancellations,
+          payments: notificationSettings.payments,
+          reviews: notificationSettings.reviews,
+          reminders: notificationSettings.reminders,
+          reminder_time: notificationSettings.reminderTime,
+          notify_new_conversation: notificationSettings.notifyNewConversation,
+          notify_new_message: notificationSettings.notifyNewMessage,
+        }),
+      })
+      setHasUnsavedChanges(false)
+      alert("Settings saved successfully!")
+    } catch (error) {
+      console.error("Failed to save settings", error)
+    }
   }
 
   const handleInputChange = (section: string, field: string, value: any) => {
@@ -263,6 +519,47 @@ export default function SettingsPage() {
 
         {/* Shop Information */}
         <TabsContent value="shop" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Your Profile</CardTitle>
+              <CardDescription>Update your account avatar</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-4">
+                <Avatar className="h-16 w-16">
+                  <AvatarImage src={profile?.avatar_url || "/placeholder.svg"} />
+                  <AvatarFallback>{getInitials(profile?.full_name)}</AvatarFallback>
+                </Avatar>
+                <div className="space-y-2">
+                  <input
+                    id="profile-avatar-upload"
+                    type="file"
+                    accept="image/*"
+                    disabled={isUploadingAvatar}
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) {
+                        uploadProfileAvatar(file)
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => document.getElementById("profile-avatar-upload")?.click()}
+                    disabled={isUploadingAvatar}
+                  >
+                    Upload Profile Pic
+                  </Button>
+                  {isUploadingAvatar && <p className="text-xs text-muted-foreground">Uploading...</p>}
+                  <div className="text-sm text-muted-foreground">
+                    {profile?.full_name || "Your account"} · {profile?.email || ""}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
           <Card>
             <CardHeader>
               <CardTitle>Basic Information</CardTitle>
@@ -628,7 +925,10 @@ export default function SettingsPage() {
                   <CardTitle>Team Members</CardTitle>
                   <CardDescription>Manage user accounts and permissions</CardDescription>
                 </div>
-                <Button>
+                <Button onClick={() => {
+                  setPendingArtistId(null)
+                  setIsCreateUserOpen(true)
+                }}>
                   <Plus className="mr-2 h-4 w-4" />
                   Add User
                 </Button>
@@ -636,35 +936,91 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {users.map((user) => (
-                  <div key={user.id} className="flex items-center justify-between p-4 border rounded-lg">
+                {teamMembers.map((member) => (
+                  <div key={member.id} className="flex items-center justify-between p-4 border rounded-lg">
                     <div className="flex items-center gap-3">
                       <Avatar>
-                        <AvatarImage src={`/placeholder.svg?height=40&width=40&text=${user.avatar}`} />
-                        <AvatarFallback>{user.avatar}</AvatarFallback>
+                        <AvatarImage src={member.avatar_url || "/placeholder.svg"} />
+                        <AvatarFallback>{getInitials(member.full_name)}</AvatarFallback>
                       </Avatar>
                       <div>
-                        <div className="font-medium">{user.name}</div>
-                        <div className="text-sm text-muted-foreground">{user.email}</div>
+                        <div className="font-medium">{member.full_name || "Unnamed User"}</div>
+                        <div className="text-sm text-muted-foreground">{member.email || "No email"}</div>
+                        {member.role === "artist" && (
+                          <div className="text-xs text-muted-foreground">
+                            Artist: {member.artist?.name || "Not connected"}
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <Badge variant={user.role === "owner" ? "default" : "secondary"}>{user.role}</Badge>
-                      <Badge variant={user.status === "active" ? "default" : "secondary"}>{user.status}</Badge>
-                      <Button variant="ghost" size="sm">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      {user.role !== "owner" && (
-                        <Button variant="ghost" size="sm">
-                          <Trash2 className="h-4 w-4" />
+                      <Badge variant={member.role === "admin" ? "default" : "secondary"}>{member.role}</Badge>
+                      {member.role === "artist" && !member.artist && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setConnectProfileId(member.id)
+                            setIsConnectArtistOpen(true)
+                          }}
+                        >
+                          Connect Artist
                         </Button>
                       )}
+                      <Button variant="ghost" size="sm" onClick={() => openEditMember(member)}>
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => openResetPassword(member)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
                 ))}
               </div>
             </CardContent>
           </Card>
+
+          {availableArtists.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Artists Without User Accounts</CardTitle>
+                <CardDescription>Connect each artist to a user account.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {availableArtists.map((artist) => (
+                    <div key={artist.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="text-sm font-medium">{artist.name}</div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setPendingArtistId(artist.id)
+                            setCreateUserData((prev) => ({ ...prev, role: "artist" }))
+                            setIsCreateUserOpen(true)
+                          }}
+                        >
+                          Create User + Connect
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setConnectProfileId(null)
+                            setConnectArtistId(artist.id)
+                            setIsConnectArtistOpen(true)
+                          }}
+                        >
+                          Connect Existing User
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader>
@@ -691,6 +1047,186 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <Dialog open={isCreateUserOpen} onOpenChange={setIsCreateUserOpen}>
+          <DialogContent className="sm:max-w-[480px]">
+            <DialogHeader>
+              <DialogTitle>Add Team Member</DialogTitle>
+              <DialogDescription>Create a user account for your studio.</DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="new-user-name">Full Name</Label>
+                <Input
+                  id="new-user-name"
+                  value={createUserData.full_name}
+                  onChange={(e) => setCreateUserData({ ...createUserData, full_name: e.target.value })}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="new-user-email">Email</Label>
+                <Input
+                  id="new-user-email"
+                  type="email"
+                  value={createUserData.email}
+                  onChange={(e) => setCreateUserData({ ...createUserData, email: e.target.value })}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="new-user-password">Temporary Password</Label>
+                <Input
+                  id="new-user-password"
+                  type="password"
+                  value={createUserData.password}
+                  onChange={(e) => setCreateUserData({ ...createUserData, password: e.target.value })}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>Role</Label>
+                <Select
+                  value={createUserData.role}
+                  onValueChange={(value) => setCreateUserData({ ...createUserData, role: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {roles.map((role) => (
+                      <SelectItem key={role.value} value={role.value}>
+                        {role.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setIsCreateUserOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={createUser} disabled={!createUserData.email || !createUserData.password}>
+                Create User
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isConnectArtistOpen} onOpenChange={setIsConnectArtistOpen}>
+          <DialogContent className="sm:max-w-[420px]">
+            <DialogHeader>
+              <DialogTitle>Connect Artist</DialogTitle>
+              <DialogDescription>Select an artist to link to this user.</DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <Select value={connectArtistId} onValueChange={setConnectArtistId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select artist" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableArtists.map((artist) => (
+                    <SelectItem key={artist.id} value={artist.id}>
+                      {artist.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setIsConnectArtistOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={connectArtistToUser} disabled={!connectArtistId}>
+                Connect
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isEditMemberOpen} onOpenChange={setIsEditMemberOpen}>
+          <DialogContent className="sm:max-w-[480px]">
+            <DialogHeader>
+              <DialogTitle>Edit Team Member</DialogTitle>
+              <DialogDescription>Update name, email, or role.</DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-member-name">Full Name</Label>
+                <Input
+                  id="edit-member-name"
+                  value={selectedMember?.full_name || ""}
+                  onChange={(e) =>
+                    setSelectedMember((prev: any) => ({ ...prev, full_name: e.target.value }))
+                  }
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-member-email">Email</Label>
+                <Input
+                  id="edit-member-email"
+                  type="email"
+                  value={selectedMember?.email || ""}
+                  onChange={(e) =>
+                    setSelectedMember((prev: any) => ({ ...prev, email: e.target.value }))
+                  }
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>Role</Label>
+                <Select
+                  value={selectedMember?.role || "artist"}
+                  onValueChange={(value) =>
+                    setSelectedMember((prev: any) => ({ ...prev, role: value }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {roles.map((role) => (
+                      <SelectItem key={role.value} value={role.value}>
+                        {role.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setIsEditMemberOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={saveMemberEdits}>Save</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isResetPasswordOpen} onOpenChange={setIsResetPasswordOpen}>
+          <DialogContent className="sm:max-w-[420px]">
+            <DialogHeader>
+              <DialogTitle>Reset Password</DialogTitle>
+              <DialogDescription>Set a temporary password for this user.</DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="reset-password">Temporary Password</Label>
+                <Input
+                  id="reset-password"
+                  type="password"
+                  value={resetPasswordValue}
+                  onChange={(e) => setResetPasswordValue(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setIsResetPasswordOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={resetMemberPassword} disabled={!resetPasswordValue}>
+                Reset Password
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Notification Settings */}
         <TabsContent value="notifications" className="space-y-6">
@@ -719,6 +1255,46 @@ export default function SettingsPage() {
                 <Switch
                   checked={notificationSettings.smsEnabled}
                   onCheckedChange={(checked) => handleInputChange("notifications", "smsEnabled", checked)}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>In-app Notifications</Label>
+                  <p className="text-sm text-muted-foreground">Show notifications in the app</p>
+                </div>
+                <Switch
+                  checked={notificationSettings.inAppEnabled}
+                  onCheckedChange={(checked) => handleInputChange("notifications", "inAppEnabled", checked)}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Messaging Notifications</CardTitle>
+              <CardDescription>Choose which messaging events notify you</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>New Conversations</Label>
+                  <p className="text-sm text-muted-foreground">When someone starts a conversation with you</p>
+                </div>
+                <Switch
+                  checked={notificationSettings.notifyNewConversation}
+                  onCheckedChange={(checked) => handleInputChange("notifications", "notifyNewConversation", checked)}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>New Messages</Label>
+                  <p className="text-sm text-muted-foreground">When you receive a new message</p>
+                </div>
+                <Switch
+                  checked={notificationSettings.notifyNewMessage}
+                  onCheckedChange={(checked) => handleInputChange("notifications", "notifyNewMessage", checked)}
                 />
               </div>
             </CardContent>

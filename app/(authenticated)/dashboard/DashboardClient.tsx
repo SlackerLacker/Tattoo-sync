@@ -18,53 +18,57 @@ import {
 } from 'recharts'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 
-const revenueData = [
-  { month: "Jan", revenue: 12400, appointments: 45 },
-  { month: "Feb", revenue: 15600, appointments: 52 },
-  { month: "Mar", revenue: 18200, appointments: 61 },
-  { month: "Apr", revenue: 16800, appointments: 58 },
-  { month: "May", revenue: 21300, appointments: 67 },
-  { month: "Jun", revenue: 19500, appointments: 63 },
-]
+type RevenuePoint = { month: string; revenue: number; appointments: number }
+type StatusPoint = { name: string; value: number; color: string }
+type TopArtist = {
+  id: string
+  name: string
+  specialty?: string
+  rating?: number
+  completedSessions: number
+  revenue: number
+}
+type ScheduleItem = {
+  id: string
+  client: string
+  artist: string
+  service: string
+  time: string
+  duration: number
+  status: string
+  price: number
+}
+type ActivityItem = { id: string; type: string; message: string; time: string }
+type DashboardStats = {
+  totalRevenue: number
+  appointments: number
+  avgPerAppointment: number
+  activeClients: number
+}
+type ChartRanges = {
+  revenueRangeLabel: string
+  statusRangeLabel: string
+}
 
-const appointmentStatusData = [
-  { name: "Confirmed", value: 45, color: "#10b981" },
-  { name: "Pending", value: 12, color: "#f59e0b" },
-  { name: "Completed", value: 128, color: "#3b82f6" },
-  { name: "Cancelled", value: 8, color: "#ef4444" },
-]
-
-const topArtists = [
-  { id: 1, name: "Mike Rodriguez", specialty: "Traditional", rating: 4.9, completedSessions: 34, revenue: 8500 },
-  { id: 2, name: "Luna Martinez", specialty: "Fine Line", rating: 4.8, completedSessions: 28, revenue: 6720 },
-  { id: 3, name: "Jake Thompson", specialty: "Realism", rating: 4.9, completedSessions: 22, revenue: 7920 },
-  { id: 4, name: "Sarah Kim", specialty: "Watercolor", rating: 4.7, completedSessions: 26, revenue: 6240 },
-]
-
-const todaysSchedule = [
-  {
-    id: 1, client: "Sarah Johnson", artist: "Mike Rodriguez", service: "Traditional Rose",
-    time: "10:00 AM", duration: 2, status: "confirmed", price: 300,
-  },
-  {
-    id: 2, client: "David Chen", artist: "Luna Martinez", service: "Fine Line Script",
-    time: "2:00 PM", duration: 1, status: "in-progress", price: 120,
-  },
-  {
-    id: 3, client: "Emma Wilson", artist: "Jake Thompson", service: "Portrait Consultation",
-    time: "4:30 PM", duration: 0.5, status: "pending", price: 90,
-  },
-]
-
-const recentActivity = [
-  { id: 1, type: "booking", message: "New appointment booked by Alex Rivera", time: "5 minutes ago" },
-  { id: 2, type: "payment", message: "Payment received from Maria Garcia ($240)", time: "12 minutes ago" },
-  { id: 3, type: "completion", message: "Session completed by Jake Thompson", time: "1 hour ago" },
-  { id: 4, type: "message", message: "New message from Tom Wilson", time: "2 hours ago" },
-  { id: 5, type: "review", message: "5-star review received for Luna Martinez", time: "3 hours ago" },
-]
-
-export default function DashboardClient({ user }: { user: User }) {
+export default function DashboardClient({
+  user,
+  stats,
+  revenueData,
+  appointmentStatusData,
+  topArtists,
+  todaysSchedule,
+  recentActivity,
+  chartRanges,
+}: {
+  user: User
+  stats: DashboardStats
+  revenueData: RevenuePoint[]
+  appointmentStatusData: StatusPoint[]
+  topArtists: TopArtist[]
+  todaysSchedule: ScheduleItem[]
+  recentActivity: ActivityItem[]
+  chartRanges: ChartRanges
+}) {
   const router = useRouter()
   const [timeRange, setTimeRange] = useState("30d")
 
@@ -106,12 +110,12 @@ export default function DashboardClient({ user }: { user: User }) {
 
   return (
     <div className="flex flex-1 flex-col gap-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground">Welcome back, {user.email}!</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm">
             <Calendar className="mr-2 h-4 w-4" />
             Today
@@ -124,13 +128,13 @@ export default function DashboardClient({ user }: { user: User }) {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Total Revenue</p>
-                <p className="text-2xl font-bold">$21,300</p>
+                <p className="text-2xl font-bold">${stats.totalRevenue.toLocaleString()}</p>
                 <p className="text-xs text-muted-foreground flex items-center mt-1">
                   <ArrowUpRight className="h-3 w-3 text-green-500 mr-1" />
                   +12.5% from last month
@@ -148,7 +152,7 @@ export default function DashboardClient({ user }: { user: User }) {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Appointments</p>
-                <p className="text-2xl font-bold">67</p>
+                <p className="text-2xl font-bold">{stats.appointments}</p>
                 <p className="text-xs text-muted-foreground flex items-center mt-1">
                   <ArrowUpRight className="h-3 w-3 text-green-500 mr-1" />
                   +8.2% from last month
@@ -166,7 +170,7 @@ export default function DashboardClient({ user }: { user: User }) {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Avg per Appointment</p>
-                <p className="text-2xl font-bold">$318</p>
+                <p className="text-2xl font-bold">${stats.avgPerAppointment.toLocaleString()}</p>
                 <p className="text-xs text-muted-foreground flex items-center mt-1">
                   <ArrowUpRight className="h-3 w-3 text-green-500 mr-1" />
                   +4.1% from last month
@@ -184,7 +188,7 @@ export default function DashboardClient({ user }: { user: User }) {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Active Clients</p>
-                <p className="text-2xl font-bold">142</p>
+                <p className="text-2xl font-bold">{stats.activeClients}</p>
                 <p className="text-xs text-muted-foreground flex items-center mt-1">
                   <ArrowUpRight className="h-3 w-3 text-green-500 mr-1" />
                   +15.3% from last month
@@ -198,12 +202,13 @@ export default function DashboardClient({ user }: { user: User }) {
         </Card>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
         {/* Revenue & Appointments Trend */}
-        <Card className="lg:col-span-2">
+        <Card>
           <CardHeader>
             <CardTitle>Revenue & Appointments Trend</CardTitle>
-            <CardDescription>Monthly performance over the last 6 months</CardDescription>
+            <CardDescription>Monthly performance for the current year</CardDescription>
+            <p className="text-xs text-muted-foreground">{chartRanges.revenueRangeLabel}</p>
           </CardHeader>
           <CardContent>
             <ChartContainer
@@ -254,6 +259,7 @@ export default function DashboardClient({ user }: { user: User }) {
           <CardHeader>
             <CardTitle>Appointment Status</CardTitle>
             <CardDescription>Current appointment distribution</CardDescription>
+            <p className="text-xs text-muted-foreground">{chartRanges.statusRangeLabel}</p>
           </CardHeader>
           <CardContent>
             <ChartContainer
@@ -289,7 +295,7 @@ export default function DashboardClient({ user }: { user: User }) {
         </Card>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
         {/* Top Artists */}
         <Card>
           <CardHeader>
@@ -321,13 +327,13 @@ export default function DashboardClient({ user }: { user: User }) {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="font-medium">{artist.name}</p>
-                        <p className="text-sm text-muted-foreground">{artist.specialty}</p>
+                        <p className="text-sm text-muted-foreground">{artist.specialty || "N/A"}</p>
                       </div>
                       <div className="text-right">
                         <p className="font-medium">${artist.revenue.toLocaleString()}</p>
                         <div className="flex items-center gap-1">
                           <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                          <span className="text-sm">{artist.rating}</span>
+                          <span className="text-sm">{(artist.rating || 0).toFixed(1)}</span>
                         </div>
                       </div>
                     </div>
@@ -350,8 +356,11 @@ export default function DashboardClient({ user }: { user: User }) {
           <CardContent>
             <div className="space-y-4">
               {todaysSchedule.map((appointment) => (
-                <div key={appointment.id} className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg">
-                  <div className="text-center">
+                <div
+                  key={appointment.id}
+                  className="flex flex-col gap-3 p-3 bg-gray-50 rounded-lg sm:flex-row sm:items-center"
+                >
+                  <div className="text-center sm:text-left">
                     <p className="text-sm font-medium">{appointment.time}</p>
                     <p className="text-xs text-muted-foreground">{appointment.duration}h</p>
                   </div>
