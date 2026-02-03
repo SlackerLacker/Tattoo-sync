@@ -1,15 +1,12 @@
 import { createServerSupabase } from "@/lib/supabase-server"
 import { NextResponse } from "next/server"
 
-<<<<<<< HEAD
-export async function PATCH(request: Request, { params }: { params: { piece_id: string } }) {
-  const supabase = createServerSupabase()
-  const pieceId = params.piece_id
-=======
-export async function PATCH(request: Request, { params }: { params: Promise<{ piece_id: string }> }) {
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ piece_id: string }> }
+) {
   const supabase = createServerSupabase()
   const { piece_id: pieceId } = await params
->>>>>>> jules-5480036992904768726-6ad232be
 
   if (!pieceId) {
     return new NextResponse("Missing piece ID", { status: 400 })
@@ -39,15 +36,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ pi
   }
 }
 
-<<<<<<< HEAD
-export async function PUT(request: Request, { params }: { params: { piece_id: string } }) {
-  const supabase = createServerSupabase()
-  const pieceId = params.piece_id
-=======
-export async function PUT(request: Request, { params }: { params: Promise<{ piece_id: string }> }) {
+export async function PUT(
+  request: Request,
+  { params }: { params: Promise<{ piece_id: string }> }
+) {
   const supabase = createServerSupabase()
   const { piece_id: pieceId } = await params
->>>>>>> jules-5480036992904768726-6ad232be
 
   if (!pieceId) {
     return new NextResponse("Missing piece ID", { status: 400 })
@@ -73,15 +67,12 @@ export async function PUT(request: Request, { params }: { params: Promise<{ piec
   }
 }
 
-<<<<<<< HEAD
-export async function DELETE(request: Request, { params }: { params: { piece_id: string } }) {
-  const supabase = createServerSupabase()
-  const pieceId = params.piece_id
-=======
-export async function DELETE(request: Request, { params }: { params: Promise<{ piece_id: string }> }) {
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ piece_id: string }> }
+) {
   const supabase = createServerSupabase()
   const { piece_id: pieceId } = await params
->>>>>>> jules-5480036992904768726-6ad232be
 
   if (!pieceId) {
     return new NextResponse("Missing piece ID", { status: 400 })
