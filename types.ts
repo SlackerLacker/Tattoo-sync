@@ -1,5 +1,6 @@
 export interface Appointment {
   id: string
+  studio_id?: string
   artist_id: string
   client_id: string
   service_id: string
@@ -7,16 +8,28 @@ export interface Appointment {
   start_time: string
   duration: number
   duration_minutes?: number
-  status: "confirmed" | "pending" | "cancelled" | "completed" | "in-progress"
+  status: "confirmed" | "pending" | "cancelled" | "completed" | "in-progress" | "no-show"
   notes?: string
   price?: number
   deposit_paid?: number
   created_at: string
   payment_status?: "paid" | "unpaid" | "deposit"
   payment_method?: string
+  payments?: Payment[]
   clients?: Client // For joined data
   artists?: Artist // For joined data
   services?: Service // For joined data
+}
+
+export interface Payment {
+  id: string
+  appointment_id: string
+  studio_id: string
+  amount: number
+  status: string
+  method?: string | null
+  reference?: string | null
+  created_at: string
 }
 
 export const specialtyOptions = [

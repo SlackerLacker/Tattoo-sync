@@ -6,12 +6,20 @@ import { Artist, Service, Client, Appointment } from "@/types"
 export default async function SchedulePage() {
   const supabase = createServerSupabase()
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  const { data: profile } = user
+    ? await supabase.from("profiles").select("role").eq("id", user.id).single()
+    : { data: null }
+
   const { data: artists } = await supabase.from("artists").select("*")
   const { data: services } = await supabase.from("services").select("*")
   const { data: clients } = await supabase.from("clients").select("*")
   const { data: appointments } = await supabase
     .from("appointments")
-    .select("*, clients:clients(*), artists:artists(*), services:services(*)")
+    .select("*, clients:clients(*), artists:artists(*), services:services(*), payments:payments(*)")
 
   return (
     <ScheduleClient
@@ -19,6 +27,8 @@ export default async function SchedulePage() {
       serverServices={services || []}
       serverClients={clients || []}
       serverAppointments={appointments || []}
+      currentUserId={user?.id || null}
+      currentUserRole={profile?.role || null}
     />
   )
 }

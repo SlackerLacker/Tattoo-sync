@@ -14,6 +14,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { formatDuration } from "@/lib/utils"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -445,7 +446,7 @@ export default function ServicesClient({ services: initialServices }: ServicesCl
                       </div>
                       <div className="flex items-center gap-1">
                         <Clock className="h-3 w-3" />
-                        {(service.duration_minutes || 0) / 60}h
+                        {formatDuration(service.duration_minutes)}
                       </div>
                     </div>
                     <div className="text-sm text-muted-foreground">{service.popularity}% popular</div>

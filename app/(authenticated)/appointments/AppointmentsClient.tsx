@@ -24,6 +24,7 @@ import {
 } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { formatDuration } from "@/lib/utils"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -571,8 +572,7 @@ export default function AppointmentsClient({
                 <div>
                   <Label className="text-sm font-medium text-muted-foreground">Duration</Label>
                   <p className="text-sm">
-                    {selectedAppointment.duration_minutes} minute
-                    {selectedAppointment.duration_minutes !== 1 ? "s" : ""}
+                    {formatDuration(selectedAppointment.duration_minutes)}
                   </p>
                 </div>
                 <div>
@@ -682,7 +682,7 @@ export default function AppointmentsClient({
                 <SelectContent>
                   {services.map((service) => (
                     <SelectItem key={service.id} value={service.id.toString()}>
-                      {service.name} ({service.duration_minutes} min) - ${service.price}
+                      {service.name} ({formatDuration(service.duration_minutes)}) - ${service.price}
                     </SelectItem>
                   ))}
                 </SelectContent>

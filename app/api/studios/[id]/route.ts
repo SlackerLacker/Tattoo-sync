@@ -5,7 +5,7 @@ import { NextResponse } from "next/server"
 export async function PUT(request: Request, { params }: { params: { id: string } }) {
   const supabase = createServerSupabase()
   const studioId = params.id
-  const { stripe_account_id } = await request.json()
+  const payload = await request.json()
 
   // Get the current user and their profile to verify ownership
   const {
@@ -28,11 +28,14 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   }
 
   // Update the studio's Stripe account ID
-  const { data, error } = await supabase
-    .from("studios")
-    .update({ stripe_account_id })
-    .eq("id", studioId)
-    .select()
+  const updates: Record<string, any> = {}
+  if ("stripe_account_id" in payload) updates.stripe_account_id = payload.stripe_account_id
+  if ("allow_online_booking" in payload) updates.allow_online_booking = payload.allow_online_booking
+  if ("require_deposit" in payload) updates.require_deposit = payload.require_deposit
+  if ("deposit_amount" in payload) updates.deposit_amount = payload.deposit_amount
+  if ("deposit_percentage" in payload) updates.deposit_percentage = payload.deposit_percentage
+
+  const { data, error } = await supabase.from("studios").update(updates).eq("id", studioId).select()
 
   if (error) {
     return new NextResponse(error.message, { status: 500 })

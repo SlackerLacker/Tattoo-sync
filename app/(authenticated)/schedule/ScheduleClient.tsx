@@ -2,7 +2,9 @@
 
 import type React from "react"
 
-import { useState, useMemo, useCallback, useEffect } from "react"
+import { useState, useMemo, useCallback, useEffect, useRef } from "react"
+import { loadStripe } from "@stripe/stripe-js"
+import { CardElement, Elements, useElements, useStripe } from "@stripe/react-stripe-js"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -12,11 +14,13 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Clock,
   Calendar,
   Edit,
   Trash2,
   MoreHorizontal,
+  MoreVertical,
   User,
   CreditCard,
   CheckCircle,
@@ -30,6 +34,8 @@ import {
   CalendarDays,
   List,
   Grid3X3,
+  SlidersHorizontal,
+  ChartBar,
 } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -47,13 +53,12 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
+import { formatDuration } from "@/lib/utils"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Artist, Service, Client, Appointment } from "@/types"
 import { Switch } from "@/components/ui/switch"
 import { toast } from "sonner"
-import { loadStripe } from "@stripe/stripe-js"
-
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
+import { supabase } from "@/lib/supabase"
 
 // Shop settings (would normally come from settings page/API)
 const shopSettings = {
@@ -69,6 +74,13 @@ const shopSettings = {
 }
 
 const paymentMethods = [
+  {
+    id: "partial",
+    name: "Partial payment",
+    description: "Charge a custom amount",
+    icon: DollarSign,
+    color: "border-slate-200 bg-white",
+  },
   {
     id: "card",
     name: "Credit/Debit Card",
@@ -117,7 +129,16 @@ interface ScheduleClientProps {
   serverServices: Service[]
   serverClients: Client[]
   serverAppointments: Appointment[]
+  currentUserId?: string | null
+  currentUserRole?: string | null
 }
+
+const SLOT_MINUTES = 30
+const SLOT_HOURS = SLOT_MINUTES / 60
+const SLOTS_PER_HOUR = Math.round(60 / SLOT_MINUTES)
+const SLOT_HEIGHT_PX = 28
+const HOUR_ROW_HEIGHT_PX = SLOT_HEIGHT_PX * SLOTS_PER_HOUR
+const TIME_RAIL_WIDTH_PX = 96
 
 // Helper to convert HH:mm:ss to a decimal hour
 const timeToDecimal = (time: string | null | undefined): number => {
@@ -156,6 +177,8 @@ export default function ScheduleClient({
   serverServices,
   serverClients,
   serverAppointments,
+  currentUserId: initialUserId = null,
+  currentUserRole: initialUserRole = null,
 }: ScheduleClientProps) {
   const [artists] = useState<Artist[]>(serverArtists)
   const [services] = useState<Service[]>(serverServices)
@@ -163,11 +186,12 @@ export default function ScheduleClient({
   const [appointments, setAppointments] = useState<Appointment[]>(serverAppointments)
 
   const [currentDate, setCurrentDate] = useState(new Date())
-  const [viewMode, setViewMode] = useState<"calendar" | "list">("calendar")
+  const [nowTime, setNowTime] = useState(new Date())
+  const [viewMode, setViewMode] = useState<"calendar" | "list" | "stats">("calendar")
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [artistFilter, setArtistFilter] = useState("all")
-  const [dateFilter, setDateFilter] = useState("all")
+  const [dateFilter, setDateFilter] = useState("today")
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null)
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -175,6 +199,17 @@ export default function ScheduleClient({
   const [isCheckoutDialogOpen, setIsCheckoutDialogOpen] = useState(false)
   const [isCashPaymentDialogOpen, setIsCashPaymentDialogOpen] = useState(false)
   const [isNewAppointmentDialogOpen, setIsNewAppointmentDialogOpen] = useState(false)
+  const [isPartialPaymentDialogOpen, setIsPartialPaymentDialogOpen] = useState(false)
+  const suppressViewOpenRef = useRef(false)
+  const paymentSectionRef = useRef<HTMLDivElement | null>(null)
+  const [highlightPaymentCard, setHighlightPaymentCard] = useState(false)
+  const [cardClientSecret, setCardClientSecret] = useState<string | null>(null)
+  const [cardPaymentIntentId, setCardPaymentIntentId] = useState<string | null>(null)
+  const [stripeAccountId, setStripeAccountId] = useState<string | null>(null)
+  const stripePromise = useMemo(() => {
+    const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || ""
+    return loadStripe(publishableKey, stripeAccountId ? { stripeAccount: stripeAccountId } : undefined)
+  }, [stripeAccountId])
   const [formData, setFormData] = useState<
     Partial<Appointment & { client_full_name: string; client_phone: string; client_email: string }>
   >({})
@@ -184,8 +219,15 @@ export default function ScheduleClient({
     tip: 0,
     notes: "",
   })
+  const [paymentAmount, setPaymentAmount] = useState<number>(0)
   const [formError, setFormError] = useState<string | null>(null)
   const [showNewClientFields, setShowNewClientFields] = useState(false)
+  const [isMobileStatsOpen, setIsMobileStatsOpen] = useState(false)
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false)
+  const [expandedUnavailableBlocks, setExpandedUnavailableBlocks] = useState<Set<string>>(new Set())
+  const dateInputRef = useRef<HTMLInputElement | null>(null)
+  const touchStartXRef = useRef<number | null>(null)
+  const touchEndXRef = useRef<number | null>(null)
 
   // Drag selection state
   const [dragSelection, setDragSelection] = useState<DragSelection>({
@@ -202,7 +244,11 @@ export default function ScheduleClient({
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null)
   const [dragOverSlot, setDragOverSlot] = useState<{ artistId: string; time: number } | null>(null)
   const [isMobile, setIsMobile] = useState(false)
-  const [mobileArtistId, setMobileArtistId] = useState<string>("")
+  const [mobileArtistId, setMobileArtistId] = useState<string>("all")
+  const [currentUserId, setCurrentUserId] = useState<string | null>(initialUserId)
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(initialUserRole)
+  const [currentArtistId, setCurrentArtistId] = useState<string | null>(null)
+  const [hasMounted, setHasMounted] = useState(false)
 
   // Get day of week for current date
   const getDayOfWeek = (date: Date) => {
@@ -229,25 +275,19 @@ export default function ScheduleClient({
     }
   }
 
-  // Generate working hours based on shop hours (by full hours)
+  // Generate working hours for full day (12am to 12am)
   const getWorkingHours = (date: Date) => {
-    const shopHours = getShopHours(date)
-    if (shopHours.closed) return []
-
     const hours = []
-    for (let hour = Math.floor(shopHours.open); hour < Math.ceil(shopHours.close); hour++) {
+    for (let hour = 0; hour < 24; hour++) {
       hours.push(hour)
     }
     return hours
   }
 
-  // Generate 15-minute time slots for scheduling
+  // Generate 30-minute time slots for full day scheduling
   const getTimeSlots = (date: Date) => {
-    const shopHours = getShopHours(date)
-    if (shopHours.closed) return []
-
     const slots = []
-    for (let time = shopHours.open; time < shopHours.close; time += 0.25) {
+    for (let time = 0; time < 24; time += SLOT_HOURS) {
       slots.push(time)
     }
     return slots
@@ -255,6 +295,12 @@ export default function ScheduleClient({
 
   const workingHours = getWorkingHours(currentDate)
   const timeSlots = getTimeSlots(currentDate)
+  const timeRailWidth = isMobile ? 72 : TIME_RAIL_WIDTH_PX
+  const timeRailMin = isMobile ? 64 : 84
+
+  useEffect(() => {
+    setHasMounted(true)
+  }, [])
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(max-width: 768px)")
@@ -265,16 +311,67 @@ export default function ScheduleClient({
   }, [])
 
   useEffect(() => {
+    let isMounted = true
+
+    const resolveArtistLink = (userId: string | null) => {
+      if (!userId) {
+        setCurrentArtistId(null)
+        return
+      }
+      const linkedArtist = artists.find((artist) => (artist as { user_id?: string }).user_id === userId)
+      setCurrentArtistId(linkedArtist?.id || null)
+    }
+
+    if (currentUserId && currentUserRole) {
+      resolveArtistLink(currentUserId)
+      return () => {
+        isMounted = false
+      }
+    }
+
+    const loadUserRole = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!isMounted) return
+
+      if (!user) {
+        setCurrentUserId(null)
+        setCurrentUserRole(null)
+        setCurrentArtistId(null)
+        return
+      }
+
+      setCurrentUserId(user.id)
+
+      const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
+      if (!isMounted) return
+
+      setCurrentUserRole(profile?.role || null)
+      resolveArtistLink(user.id)
+    }
+
+    loadUserRole()
+
+    return () => {
+      isMounted = false
+    }
+  }, [artists, currentUserId, currentUserRole])
+
+  useEffect(() => {
     if (!artists.length) return
     if (mobileArtistId) return
-    setMobileArtistId(artists[0].id)
+    setMobileArtistId("all")
   }, [artists, mobileArtistId])
 
   const visibleArtists = useMemo(() => {
     if (!isMobile) return artists
+    if (!mobileArtistId || mobileArtistId === "all") return artists
     const selected = artists.find((artist) => artist.id === mobileArtistId)
-    return selected ? [selected] : artists.slice(0, 1)
+    return selected ? [selected] : artists
   }, [artists, isMobile, mobileArtistId])
+
 
   // Check if artist is available at specific time
   // This is a simplified check. A more robust solution would involve checking artist-specific schedules.
@@ -308,6 +405,29 @@ export default function ScheduleClient({
     setCurrentDate(newDate)
   }
 
+  const handleDateSwipeStart = (event: React.TouchEvent) => {
+    touchStartXRef.current = event.touches[0]?.clientX ?? null
+    touchEndXRef.current = null
+  }
+
+  const handleDateSwipeMove = (event: React.TouchEvent) => {
+    touchEndXRef.current = event.touches[0]?.clientX ?? null
+  }
+
+  const handleDateSwipeEnd = () => {
+    if (touchStartXRef.current === null || touchEndXRef.current === null) return
+    const deltaX = touchStartXRef.current - touchEndXRef.current
+    const threshold = 40
+    if (Math.abs(deltaX) < threshold) return
+    if (deltaX > 0) {
+      navigateDay("next")
+    } else {
+      navigateDay("prev")
+    }
+    touchStartXRef.current = null
+    touchEndXRef.current = null
+  }
+
   // Get appointments that START in this specific time slot
   const getAppointmentsStartingInSlot = (artistId: string, time: number) => {
     return appointments.filter((apt) => {
@@ -329,7 +449,11 @@ export default function ScheduleClient({
   const isAvailable = (artistId: string, time: number) => {
     const currentDateStr = getLocalDateString(currentDate)
 
-    if (!isShopOpen(time, currentDate) || !isArtistAvailable(artistId, time, currentDate)) return false
+    const canOverride = canOverrideHoursForArtist(artistId)
+
+    if (!canOverride && (!isShopOpen(time, currentDate) || !isArtistAvailable(artistId, time, currentDate))) {
+      return false
+    }
 
     const hasAppointment = appointments.some((apt) => {
       if (!apt.appointment_date) return false
@@ -372,12 +496,103 @@ export default function ScheduleClient({
     return "available"
   }
 
+  const mobileHourRows = useMemo(() => {
+    if (!isMobile || visibleArtists.length !== 1) {
+      return workingHours.map((hour) => ({ type: "hour", hour }))
+    }
+
+    const artistId = visibleArtists[0].id
+    const rows: Array<
+      | { type: "hour"; hour: number }
+      | { type: "collapsed"; key: string; artistId: string; hiddenHours: number }
+    > = []
+
+    let index = 0
+    while (index < workingHours.length) {
+      const hour = workingHours[index]
+      const hourUnavailable =
+        isUnavailableStatus(getSlotStatus(artistId, hour)) &&
+        isUnavailableStatus(getSlotStatus(artistId, hour + SLOT_HOURS))
+
+      if (!hourUnavailable) {
+        rows.push({ type: "hour", hour })
+        index += 1
+        continue
+      }
+
+      const startIndex = index
+      while (index < workingHours.length) {
+        const scanHour = workingHours[index]
+        const scanUnavailable =
+          isUnavailableStatus(getSlotStatus(artistId, scanHour)) &&
+          isUnavailableStatus(getSlotStatus(artistId, scanHour + SLOT_HOURS))
+        if (!scanUnavailable) break
+        index += 1
+      }
+
+      const blockLength = index - startIndex
+      const blockKey = `${artistId}:${workingHours[startIndex]}`
+      const isExpanded = expandedUnavailableBlocks.has(blockKey)
+
+      if (blockLength <= 2 || isExpanded) {
+        for (let i = startIndex; i < index; i += 1) {
+          rows.push({ type: "hour", hour: workingHours[i] })
+        }
+      } else {
+        rows.push({ type: "hour", hour: workingHours[startIndex] })
+        rows.push({ type: "hour", hour: workingHours[startIndex + 1] })
+        rows.push({
+          type: "collapsed",
+          key: blockKey,
+          artistId,
+          hiddenHours: blockLength - 2,
+        })
+      }
+    }
+
+    return rows
+  }, [expandedUnavailableBlocks, isMobile, visibleArtists, workingHours, currentDate, appointments])
+
+  const unavailableMidpoints = useMemo(() => {
+    const map = new Map<string, Set<number>>()
+    visibleArtists.forEach((artist) => {
+      const midpoints = new Set<number>()
+      let index = 0
+
+      while (index < timeSlots.length) {
+        const time = timeSlots[index]
+        const status = getSlotStatus(artist.id, time)
+        if (!isUnavailableStatus(status)) {
+          index += 1
+          continue
+        }
+
+        const startIndex = index
+        while (index < timeSlots.length) {
+          const scanTime = timeSlots[index]
+          const scanStatus = getSlotStatus(artist.id, scanTime)
+          if (!isUnavailableStatus(scanStatus)) break
+          index += 1
+        }
+
+        const length = index - startIndex
+        const midpointIndex = startIndex + Math.floor(length / 2)
+        const midpointTime = timeSlots[midpointIndex]
+        midpoints.add(Number(midpointTime.toFixed(2)))
+      }
+
+      map.set(artist.id, midpoints)
+    })
+
+    return map
+  }, [visibleArtists, timeSlots, currentDate, appointments])
+
   const formatTime = (time: number) => {
     const h = Math.floor(time)
-    const m = (time % 1) * 60
+    const m = Math.floor((time % 1) * 60)
     const period = h >= 12 ? "PM" : "AM"
     const displayHour = h > 12 ? h - 12 : h === 0 ? 12 : h
-    return `${displayHour}${m > 0 ? `:${m.toString().padStart(2, "0")}` : ""}${period}`
+    return `${displayHour}:${m.toString().padStart(2, "0")}${period}`
   }
 
   const formatHourOnly = (hour: number) => {
@@ -394,6 +609,24 @@ export default function ScheduleClient({
       day: "numeric",
       year: "numeric",
     })
+  }
+
+  const getPaymentsTotal = (appointment?: Appointment | null) => {
+    if (!appointment?.payments?.length) return 0
+    return appointment.payments.reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0)
+  }
+
+  const getTotalPaid = (appointment?: Appointment | null) => {
+    if (!appointment) return 0
+    const depositPaid = appointment.deposit_paid || 0
+    const paymentsTotal = getPaymentsTotal(appointment)
+    return paymentsTotal >= depositPaid ? paymentsTotal : depositPaid + paymentsTotal
+  }
+
+  const getBalanceDue = (appointment?: Appointment | null) => {
+    if (!appointment) return 0
+    const totalPaid = getTotalPaid(appointment)
+    return Math.max(0, (appointment.price || 0) - totalPaid)
   }
 
   const getStatusColor = (status: string) => {
@@ -453,11 +686,11 @@ export default function ScheduleClient({
 
     switch (status) {
       case "available":
-        return "bg-green-50 hover:bg-green-100"
+        return "bg-white hover:bg-green-50"
       case "artist-unavailable":
-        return "bg-gray-100"
+        return "bg-slate-50"
       case "shop-closed":
-        return "bg-gray-200"
+        return "bg-slate-100"
       case "booked":
         return "bg-white"
       default:
@@ -477,6 +710,38 @@ export default function ScheduleClient({
   const getArtistById = (id: any | null | undefined) => {
     if (!id) return null
     return artists.find((artist) => artist.id === id)
+  }
+
+  function isUnavailableStatus(status: string) {
+    return status === "artist-unavailable" || status === "shop-closed"
+  }
+
+  function canOverrideHoursForArtist(artistId: string) {
+    if (currentUserRole === "admin" || currentUserRole === "superadmin") return true
+    if (currentUserRole === "artist" && currentArtistId === artistId) return true
+    return false
+  }
+
+  const getUnavailableStyle = (time: number) => {
+    const slotIndex = Math.round(time / SLOT_HOURS)
+    const offsetY = slotIndex * SLOT_HEIGHT_PX
+    return {
+      backgroundColor: "#f8fafc",
+      backgroundImage:
+        "repeating-linear-gradient(135deg, rgba(148,163,184,0.12) 0, rgba(148,163,184,0.12) 8px, transparent 8px, transparent 16px)",
+      backgroundSize: "24px 24px",
+      backgroundPosition: `0 ${-offsetY}px`,
+    }
+  }
+
+  const getArtistAvatar = (artist: Artist) => {
+    return (
+      artist.avatar_url ||
+      artist.profileImage ||
+      (artist as { avatar?: string }).avatar ||
+      (artist as { imageUrl?: string }).imageUrl ||
+      "/placeholder-user.jpg"
+    )
   }
 
   const calculatePrice = (artistId: any | null | undefined, duration: number | null | undefined) => {
@@ -500,6 +765,10 @@ export default function ScheduleClient({
       tip: 0,
       notes: "",
     })
+    setPaymentAmount(0)
+    setCardClientSecret(null)
+    setCardPaymentIntentId(null)
+    setStripeAccountId(null)
   }
 
   // Drag selection handlers
@@ -551,7 +820,7 @@ export default function ScheduleClient({
     if (dragSelection.isDragging && dragSelection.startTime !== null && dragSelection.endTime !== null) {
       const startTime = Math.min(dragSelection.startTime, dragSelection.endTime)
       const endTime = Math.max(dragSelection.startTime, dragSelection.endTime)
-      const duration = endTime - startTime + 0.25 // Add 0.25 to include the end slot
+      const duration = endTime - startTime + SLOT_HOURS // Include the end slot
 
       // Check if all slots in the selection are available
       const allSlotsAvailable = timeSlots
@@ -629,6 +898,13 @@ export default function ScheduleClient({
     }
   }, [dragSelection.isDragging, handleMouseEnter, handleMouseUp])
 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNowTime(new Date())
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [])
+
   // Add these new functions after the existing drag selection handlers
   const handleAppointmentDragStart = useCallback((appointment: Appointment, event: React.DragEvent) => {
     setDraggedAppointment(appointment)
@@ -667,13 +943,14 @@ export default function ScheduleClient({
       const currentDateStr = getLocalDateString(currentDate)
       const appointmentDurationHours = (draggedAppointment.duration || 60) / 60
       const appointmentEndTime = time + appointmentDurationHours
+      const canOverride = canOverrideHoursForArtist(artistId)
       const slotsNeeded = []
-      for (let t = time; t < appointmentEndTime; t += 0.25) {
+      for (let t = time; t < appointmentEndTime; t += SLOT_HOURS) {
         slotsNeeded.push(t)
       }
 
       const allSlotsAvailable = slotsNeeded.every((slot) => {
-        if (!isShopOpen(slot, currentDate) || !isArtistAvailable(artistId, slot, currentDate)) {
+        if (!canOverride && (!isShopOpen(slot, currentDate) || !isArtistAvailable(artistId, slot, currentDate))) {
           return false
         }
         const hasConflict = appointments.some(
@@ -749,6 +1026,7 @@ export default function ScheduleClient({
   const isInDragSelection = (artistId: string, time: number) => {
     if (!dragSelection.isDragging || dragSelection.artistId !== artistId) return false
     if (dragSelection.startTime === null || dragSelection.currentTime === null) return false
+    if (!isAvailable(artistId, time)) return false
 
     const start = Math.min(dragSelection.startTime, dragSelection.currentTime)
     const end = Math.max(dragSelection.startTime, dragSelection.currentTime)
@@ -879,7 +1157,27 @@ export default function ScheduleClient({
   const handleEditAppointment = async () => {
     if (!selectedAppointment) return
 
-    const payload = { ...formData }
+    const {
+      clients: _clients,
+      artists: _artists,
+      services: _services,
+      ...payload
+    } = formData as Partial<Appointment>
+    const paymentsTotal = getPaymentsTotal(selectedAppointment)
+    const depositPaid = formData.deposit_paid ?? selectedAppointment.deposit_paid ?? 0
+    const totalPaid = paymentsTotal >= depositPaid ? paymentsTotal : depositPaid + paymentsTotal
+    const hasPayment = totalPaid > 0
+    if (hasPayment && payload.status && !["confirmed", "completed"].includes(payload.status)) {
+      toast.error("With payments attached, status can only be Confirmed or Completed.")
+      return
+    }
+    if (payload.status === "completed" || payload.status === "in-progress") {
+      const balanceDue = getBalanceDue(selectedAppointment)
+      if (balanceDue > 0) {
+        toast.error("Cannot move to this status while a balance is still due.")
+        return
+      }
+    }
     const response = await fetch(`/api/appointments/${selectedAppointment.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -888,20 +1186,28 @@ export default function ScheduleClient({
 
     if (response.ok) {
       const updatedAppointment = await response.json()
+      const nextAppointment = updatedAppointment[0]
       setAppointments(
-        appointments.map((apt) => (apt.id === selectedAppointment.id ? updatedAppointment[0] : apt)),
+        appointments.map((apt) => (apt.id === selectedAppointment.id ? nextAppointment : apt)),
       )
+      setSelectedAppointment((prev) => (prev?.id === selectedAppointment.id ? nextAppointment : prev))
       setIsEditDialogOpen(false)
+      setIsViewDialogOpen(false)
       resetForm()
       toast.success("Appointment updated!")
     } else {
-      // Handle error
-      console.error("Failed to update appointment")
+      const message = await response.text()
+      console.error("Failed to update appointment", message)
+      toast.error(`Failed to update appointment: ${message}`)
     }
   }
 
   const handleDeleteAppointment = async () => {
     if (selectedAppointment) {
+      if (selectedAppointment.payment_status === "paid" || getTotalPaid(selectedAppointment) > 0) {
+        toast.error("Cannot cancel or delete this appointment because a payment has been received.")
+        return
+      }
       await fetch(`/api/appointments/${selectedAppointment.id}`, { method: "DELETE" })
       setAppointments(appointments.filter((apt) => apt.id !== selectedAppointment.id))
       setIsDeleteDialogOpen(false)
@@ -912,17 +1218,27 @@ export default function ScheduleClient({
   const handlePaymentMethodSelect = (method: string) => {
     if (!selectedAppointment) return
 
-    const balanceDue = (selectedAppointment.price || 0) - (selectedAppointment.deposit_paid || 0)
+    const balanceDue = getBalanceDue(selectedAppointment)
 
     switch (method) {
+      case "partial":
+        setIsPartialPaymentDialogOpen(true)
+        return
       case "card":
-        // Redirect to Stripe checkout
-        handleStripeCheckout(balanceDue)
+        if (paymentAmount <= 0 || paymentAmount > balanceDue) {
+          toast.error("Enter a valid partial amount.")
+          return
+        }
+        handleStripeCheckout(paymentAmount)
         break
       case "cash":
         // Open cash payment dialog
+        if (paymentAmount <= 0 || paymentAmount > balanceDue) {
+          toast.error("Enter a valid partial amount.")
+          return
+        }
         setCashPaymentData({
-          amountReceived: balanceDue,
+          amountReceived: paymentAmount,
           tip: 0,
           notes: "",
         })
@@ -931,11 +1247,19 @@ export default function ScheduleClient({
         break
       case "cashapp":
         // Generate Cash App link
-        handleCashAppPayment(balanceDue)
+        if (paymentAmount <= 0 || paymentAmount > balanceDue) {
+          toast.error("Enter a valid partial amount.")
+          return
+        }
+        handleCashAppPayment(paymentAmount)
         break
       case "venmo":
         // Generate Venmo link
-        handleVenmoPayment(balanceDue)
+        if (paymentAmount <= 0 || paymentAmount > balanceDue) {
+          toast.error("Enter a valid partial amount.")
+          return
+        }
+        handleVenmoPayment(paymentAmount)
         break
     }
   }
@@ -946,34 +1270,36 @@ export default function ScheduleClient({
       return
     }
 
+    if (amount <= 0) {
+      toast.error("Enter a valid amount to charge.")
+      return
+    }
+
     try {
-      const response = await fetch("/api/stripe/checkout", {
+      setCardClientSecret(null)
+      setCardPaymentIntentId(null)
+      const response = await fetch("/api/stripe/intent", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ appointment: selectedAppointment }),
+        body: JSON.stringify({ appointmentId: selectedAppointment.id, amount }),
       })
 
       if (!response.ok) {
-        toast.error(`Payment API error: ${response.statusText}`)
+        const message = await response.text()
+        toast.error(`Payment API error: ${message}`)
         return
       }
 
-      const session = await response.json()
-
-      if (!session || !session.id) {
-        toast.error("Failed to create a valid payment session.")
+      const intent = await response.json()
+      if (!intent?.clientSecret) {
+        toast.error("Failed to create a valid payment intent.")
         return
       }
-
-      // The session object now contains a `url` property.
-      // We will use this to redirect the user to the Stripe checkout page.
-      if (session.url) {
-        window.location.href = session.url
-      } else {
-        toast.error("Could not get checkout URL. Please try again.")
-      }
+      setStripeAccountId(intent.stripeAccountId || null)
+      setCardClientSecret(intent.clientSecret)
+      setCardPaymentIntentId(intent.paymentIntentId || null)
     } catch (error) {
       console.error("Error during Stripe checkout process:", error)
       toast.error("Could not connect to payment provider.")
@@ -983,7 +1309,7 @@ export default function ScheduleClient({
   const handleCashAppPayment = (amount: number) => {
     const shopCashAppHandle = "$InkStudioTattoo" // This would be configurable
     const note = `Payment for ${selectedAppointment?.services?.name} - ${selectedAppointment?.clients?.full_name}`
-    const cashAppUrl = `https://cash.app/${shopCashAppHandle}/${amount}?note=${encodeURIComponent(note)}`
+    const cashAppUrl = `https://cash.app/${shopCashAppHandle}/${amount}-note=${encodeURIComponent(note)}`
 
     // Open Cash App
     window.open(cashAppUrl, "_blank")
@@ -999,10 +1325,10 @@ export default function ScheduleClient({
   const handleVenmoPayment = (amount: number) => {
     const shopVenmoHandle = "InkStudio-Tattoo" // This would be configurable
     const note = `Payment for ${selectedAppointment?.services?.name} - ${selectedAppointment?.clients?.full_name}`
-    const venmoUrl = `venmo://paycharge?txn=pay&recipients=${shopVenmoHandle}&amount=${amount}&note=${encodeURIComponent(note)}`
+    const venmoUrl = `venmo://paycharge-txn=pay&recipients=${shopVenmoHandle}&amount=${amount}&note=${encodeURIComponent(note)}`
 
     // Try to open Venmo app, fallback to web
-    const fallbackUrl = `https://venmo.com/${shopVenmoHandle}?txn=pay&amount=${amount}&note=${encodeURIComponent(note)}`
+    const fallbackUrl = `https://venmo.com/${shopVenmoHandle}-txn=pay&amount=${amount}&note=${encodeURIComponent(note)}`
 
     try {
       window.location.href = venmoUrl
@@ -1025,13 +1351,32 @@ export default function ScheduleClient({
     resetCheckout()
   }
 
-  const completePayment = async (method: string, totalAmount: number, tip: number) => {
+  const completePayment = async (
+    method: string,
+    totalAmount: number,
+    tip: number,
+    details?: { reference?: string | null; card_brand?: string | null; card_last4?: string | null },
+  ) => {
     if (selectedAppointment) {
+      const appliedAmount = Math.max(0, totalAmount - tip)
+      const depositPaid = selectedAppointment.deposit_paid || 0
+      const existingPaymentsTotal = getPaymentsTotal(selectedAppointment)
+      const nextPaymentsTotal = existingPaymentsTotal + appliedAmount
+      const nextTotalPaid = nextPaymentsTotal >= depositPaid ? nextPaymentsTotal : depositPaid + nextPaymentsTotal
+      const nextPaymentStatus =
+        nextTotalPaid >= (selectedAppointment.price || 0)
+          ? ("paid" as const)
+          : nextTotalPaid > 0
+            ? ("deposit" as const)
+            : ("unpaid" as const)
+      const nextStatus =
+        nextTotalPaid >= (selectedAppointment.price || 0)
+          ? ("completed" as const)
+          : ((selectedAppointment.status || "confirmed") as Appointment["status"])
       const payload = {
-        status: "completed" as const,
-        payment_status: "paid" as const,
+        status: nextStatus,
+        payment_status: nextPaymentStatus,
         payment_method: method,
-        price: (selectedAppointment.price || 0) + tip,
       }
 
       const response = await fetch(`/api/appointments/${selectedAppointment.id}`, {
@@ -1042,16 +1387,45 @@ export default function ScheduleClient({
 
       if (response.ok) {
         const updatedAppointment = await response.json()
+        const nextAppointment = updatedAppointment[0]
+        const paymentResponse = await fetch("/api/payments", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            appointment_id: selectedAppointment.id,
+            studio_id: selectedAppointment.studio_id,
+            amount: totalAmount,
+            status: "paid",
+            method,
+            reference: details?.reference || `${method}-${Date.now()}`,
+            card_brand: details?.card_brand ?? null,
+            card_last4: details?.card_last4 ?? null,
+          }),
+        })
+        const payment = paymentResponse.ok ? await paymentResponse.json() : null
+        const nextPayments = payment
+          ? [...(selectedAppointment.payments || []), payment]
+          : selectedAppointment.payments
+        const mergedAppointment = { ...nextAppointment, payments: nextPayments }
         setAppointments(
-          appointments.map((apt) => (apt.id === selectedAppointment.id ? updatedAppointment[0] : apt)),
+          appointments.map((apt) => (apt.id === selectedAppointment.id ? mergedAppointment : apt)),
         )
-        setSelectedAppointment(null)
+        setSelectedAppointment(mergedAppointment)
+        setPaymentAmount(0)
+        setIsCashPaymentDialogOpen(false)
+        setIsCheckoutDialogOpen(false)
       }
     }
   }
 
   const openViewDialog = (appointment: Appointment) => {
+    if (suppressViewOpenRef.current) return
     setSelectedAppointment(appointment)
+    setIsEditDialogOpen(false)
+    setIsNewAppointmentDialogOpen(false)
+    setIsDeleteDialogOpen(false)
+    setIsCheckoutDialogOpen(false)
+    setIsCashPaymentDialogOpen(false)
     setIsViewDialogOpen(true)
   }
 
@@ -1067,16 +1441,54 @@ export default function ScheduleClient({
   }
 
   const openDeleteDialog = (appointment: Appointment) => {
+    if (appointment.payment_status === "paid" || getTotalPaid(appointment) > 0) {
+      toast.error("Cannot cancel or delete this appointment because a payment has been received.")
+      return
+    }
+    suppressViewOpenRef.current = true
+    setTimeout(() => {
+      suppressViewOpenRef.current = false
+    }, 0)
     setSelectedAppointment(appointment)
+    setIsViewDialogOpen(false)
+    setIsEditDialogOpen(false)
+    setIsNewAppointmentDialogOpen(false)
     setIsDeleteDialogOpen(true)
   }
 
   const openCheckoutDialog = (appointment: Appointment) => {
     setSelectedAppointment(appointment)
+    const balanceDue = getBalanceDue(appointment)
+    setPaymentAmount(Math.max(0, balanceDue))
     setIsCheckoutDialogOpen(true)
   }
 
   const updateAppointmentStatus = async (appointmentId: any, newStatus: Appointment["status"]) => {
+    const appointment = appointments.find((apt) => apt.id === appointmentId)
+    if (!appointment) return
+
+    if (newStatus === "cancelled") {
+      if (appointment.payment_status === "paid" || getTotalPaid(appointment) > 0) {
+        toast.error("Cannot cancel this appointment because a payment has been received.")
+        return
+      }
+    }
+
+    const balanceDue = getBalanceDue(appointment)
+    if ((newStatus === "completed" || newStatus === "in-progress") && balanceDue > 0) {
+      toast.error("Cannot move to this status while a balance is still due.")
+      return
+    }
+    let previousAppointment: Appointment | undefined
+    setAppointments((prev) =>
+      prev.map((apt) => {
+        if (apt.id !== appointmentId) return apt
+        previousAppointment = apt
+        return { ...apt, status: newStatus }
+      }),
+    )
+    setSelectedAppointment((prev) => (prev?.id === appointmentId ? { ...prev, status: newStatus } : prev))
+
     const response = await fetch(`/api/appointments/${appointmentId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -1084,22 +1496,29 @@ export default function ScheduleClient({
     })
     if (response.ok) {
       const updatedAppointment = await response.json()
-      setAppointments(
-        appointments.map((apt) => (apt.id === appointmentId ? updatedAppointment[0] : apt)),
-      )
+      const nextAppointment = updatedAppointment[0]
+      setAppointments((prev) => prev.map((apt) => (apt.id === appointmentId ? nextAppointment : apt)))
+      setSelectedAppointment((prev) => (prev?.id === appointmentId ? nextAppointment : prev))
+      return
+    }
+
+    if (previousAppointment) {
+      setAppointments((prev) => prev.map((apt) => (apt.id === appointmentId ? previousAppointment! : apt)))
+      setSelectedAppointment((prev) => (prev?.id === appointmentId ? previousAppointment! : prev))
     }
   }
 
   const handleServiceChange = (serviceId: string) => {
     const selectedService = services.find((s) => s.id === serviceId)
     if (!selectedService) return
+    const serviceDuration = selectedService.duration ?? selectedService.duration_minutes
 
     setFormData((prev) => ({
       ...prev,
       service_id: selectedService.id,
-      // Only set price and duration if they are not already set (i.e., for new appointments)
-      duration: prev.duration || selectedService.duration,
-      price: prev.price || selectedService.price,
+      // Always align duration with the selected service when available
+      duration: serviceDuration ?? prev.duration,
+      price: selectedService.price ?? prev.price,
     }))
   }
 
@@ -1243,15 +1662,26 @@ export default function ScheduleClient({
     }
   }, [viewMode, appointments, filteredAppointments, currentDate])
 
+  const statsFilters = useMemo(() => {
+    const labels: string[] = []
+    if (statusFilter !== "all") {
+      labels.push(statusFilter.replace("-", " "))
+    }
+    if (artistFilter !== "all") {
+      const artist = artists.find((item) => item.id === artistFilter)
+      if (artist?.name) labels.push(artist.name)
+    }
+    if (dateFilter && dateFilter !== "today") {
+      labels.push(dateFilter.replace("-", " "))
+    }
+    return labels
+  }, [artistFilter, artists, dateFilter, statusFilter])
+
   return (
     <div className="flex flex-1 flex-col gap-4" onMouseUp={handleMouseUp}>
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Schedule</h1>
-          <p className="text-muted-foreground">Manage appointments with calendar and list views</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as "calendar" | "list")}>
+        <div className="flex flex-wrap items-center gap-2">
+          <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as "calendar" | "list" | "stats")}>
             <TabsList>
               <TabsTrigger value="calendar" className="flex items-center gap-2">
                 <Grid3X3 className="h-4 w-4" />
@@ -1261,73 +1691,120 @@ export default function ScheduleClient({
                 <List className="h-4 w-4" />
                 List
               </TabsTrigger>
+              <TabsTrigger value="stats" className="flex items-center gap-2">
+                <ChartBar className="h-4 w-4" />
+                Stats
+              </TabsTrigger>
             </TabsList>
           </Tabs>
-          <Button onClick={handleNewAppointment}>
-            <Plus className="mr-2 h-4 w-4" />
-            New Appointment
-          </Button>
         </div>
       </div>
+
 
       {viewMode === "calendar" ? (
         <>
           {/* Date Navigation */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button variant="outline" size="sm" onClick={() => navigateDay("prev")}>
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <div className="flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-gray-500" />
-                <h2 className="text-xl font-semibold">
+          {isMobile ? (
+            <div
+              className="rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm"
+              onTouchStart={handleDateSwipeStart}
+              onTouchMove={handleDateSwipeMove}
+              onTouchEnd={handleDateSwipeEnd}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => dateInputRef.current?.showPicker?.()}
+                  className="flex items-center gap-2 text-base font-semibold text-slate-900"
+                >
                   {currentDate.toLocaleDateString("en-US", {
-                    weekday: "long",
-                    year: "numeric",
-                    month: "long",
+                    weekday: "short",
+                    month: "short",
                     day: "numeric",
                   })}
-                </h2>
-                {isToday(currentDate) && (
-                  <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full font-medium">Today</span>
+                  <ChevronDown className="h-4 w-4 text-slate-400" />
+                </button>
+                {!isToday(currentDate) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="rounded-full border border-slate-200 px-3"
+                    onClick={() => setCurrentDate(new Date())}
+                  >
+                    Today
+                  </Button>
                 )}
               </div>
-              <Button variant="outline" size="sm" onClick={() => navigateDay("next")}>
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline">
-                Shop Hours:{" "}
+              <Input
+                ref={dateInputRef}
+                type="date"
+                value={getLocalDateString(currentDate)}
+                onChange={(e) => setCurrentDate(parseLocalDateString(e.target.value))}
+                className="sr-only"
+              />
+              <div className="mt-2 text-xs text-slate-500">
                 {getShopHours(currentDate).closed
-                  ? "Closed"
-                  : `${formatTime(getShopHours(currentDate).open)} - ${formatTime(getShopHours(currentDate).close)}`}
-              </Badge>
-              <Button variant="outline" onClick={() => setCurrentDate(new Date())}>
-                Go to Today
-              </Button>
+                  ? "Shop hours: Closed"
+                  : `Shop hours: ${formatTime(getShopHours(currentDate).open)} - ${formatTime(
+                      getShopHours(currentDate).close,
+                    )}`}
+              </div>
             </div>
-          </div>
-
-          {/* Instructions */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-            <p className="text-sm text-blue-800">
-              <strong>Tip:</strong> Click a time slot to create a quick appointment, or drag across multiple slots to
-              create longer appointments. Hover over time slots to see exact times.
-            </p>
-          </div>
+          ) : (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <Button variant="outline" size="sm" onClick={() => navigateDay("prev")}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-5 w-5 text-gray-500" />
+                  <h2 className="text-xl font-semibold">
+                    {currentDate.toLocaleDateString("en-US", {
+                      weekday: "long",
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                    })}
+                  </h2>
+                  {isToday(currentDate) && (
+                    <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full font-medium">Today</span>
+                  )}
+                </div>
+                <Button variant="outline" size="sm" onClick={() => navigateDay("next")}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline">
+                  Shop Hours:{" "}
+                  {getShopHours(currentDate).closed
+                    ? "Closed"
+                    : `${formatTime(getShopHours(currentDate).open)} - ${formatTime(getShopHours(currentDate).close)}`}
+                </Badge>
+                <Button variant="outline" onClick={() => setCurrentDate(new Date())}>
+                  Go to Today
+                </Button>
+              </div>
+            </div>
+          )}
 
           {/* Calendar Grid */}
-          <Card className="flex-1">
-            <CardContent className="p-0">
+          <Card className="flex-1 w-full -mx-4 sm:mx-0 rounded-none sm:rounded-xl border-x-0 sm:border">
+            <CardContent
+              className="p-0"
+              onTouchStart={handleDateSwipeStart}
+              onTouchMove={handleDateSwipeMove}
+              onTouchEnd={handleDateSwipeEnd}
+            >
               {isMobile && visibleArtists.length > 0 && (
                 <div className="px-4 py-3 border-b bg-gray-50">
                   <Label className="text-xs text-gray-500">Artist</Label>
                   <Select value={mobileArtistId} onValueChange={setMobileArtistId}>
                     <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Select artist" />
+                      <SelectValue placeholder="All artists" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="all">All artists</SelectItem>
                       {artists.map((artist) => (
                         <SelectItem key={artist.id} value={artist.id}>
                           {artist.name}
@@ -1341,22 +1818,17 @@ export default function ScheduleClient({
               <div
                 className="grid border-b"
                 style={{
-                  gridTemplateColumns: `minmax(84px, 96px) repeat(${visibleArtists.length}, minmax(180px, 1fr))`,
+                  gridTemplateColumns: `minmax(${timeRailMin}px, ${timeRailWidth}px) repeat(${visibleArtists.length}, minmax(${isMobile ? 140 : 180}px, 1fr))`,
                 }}
               >
-                <div className="p-4 border-r bg-gray-50 font-medium text-sm">Time</div>
+                <div className="px-4 py-3 border-r bg-gray-50" />
                 {visibleArtists.map((artist) => (
-                  <div key={artist.id} className="p-4 border-r last:border-r-0 bg-gray-50">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-8 w-8">
+                    <div key={artist.id} className="p-3 border-r last:border-r-0 bg-gray-50">
+                      <div className="flex flex-col items-center justify-center gap-2 text-center">
+                      <Avatar className={`ring-2 ring-white shadow-sm ${isMobile ? "h-8 w-8" : "h-10 w-10"}`}>
                         <AvatarImage
-                          src={
-                            artist.avatar_url ||
-                            `/placeholder.svg?height=32&width=32&text=${artist.name
-                              .split(" ")
-                              .map((n) => n[0])
-                              .join("")}`
-                          }
+                          src={getArtistAvatar(artist)}
+                          alt={artist.name}
                         />
                         <AvatarFallback className="text-xs">
                           {artist.name
@@ -1366,9 +1838,11 @@ export default function ScheduleClient({
                         </AvatarFallback>
                       </Avatar>
                       <div>
-                        <div className="font-medium text-sm">{artist.name}</div>
-                        <div className="text-xs text-gray-500">
-                          {artist.specialty} • ${artist.hourlyRate}/hr
+                        <div className={`font-medium text-gray-900 ${isMobile ? "text-xs" : "text-sm"}`}>
+                          {artist.name}
+                        </div>
+                        <div className="hidden">
+                          {artist.specialty} - ${artist.hourlyRate}/hr
                         </div>
                       </div>
                     </div>
@@ -1376,78 +1850,173 @@ export default function ScheduleClient({
                 ))}
               </div>
 
-              {/* Scrollable Time Slots */}
-              <ScrollArea className="h-[600px]">
-                {workingHours.map((hour) => (
+              {/* Time Slots */}
+              <div className="relative">
+                {hasMounted && isToday(currentDate) && (
                   <div
-                    key={hour}
-                    className="grid border-b last:border-b-0 min-h-[120px]"
+                    className="absolute z-30 pointer-events-none"
                     style={{
-                      gridTemplateColumns: `minmax(84px, 96px) repeat(${visibleArtists.length}, minmax(180px, 1fr))`,
+                      top: `${(nowTime.getHours() + nowTime.getMinutes() / 60 + nowTime.getSeconds() / 3600) * HOUR_ROW_HEIGHT_PX}px`,
+                      left: `${timeRailWidth}px`,
+                      right: 0,
                     }}
                   >
-                    {/* Time label */}
-                    <div className="p-3 border-r bg-gray-50 flex items-start justify-center">
-                      <div className="text-center">
-                        <div className="font-medium text-sm whitespace-pre-line">{formatHourOnly(hour)}</div>
+                    <div className="relative h-0.5 bg-red-500/90">
+                      <div className="absolute -left-2 -top-1 h-3 w-3 rounded-full bg-red-500 shadow" />
+                      <div className="absolute -left-14 -top-2 rounded-full bg-white border border-red-200 px-2 py-0.5 text-[10px] font-semibold text-red-600 shadow-sm">
+                        {nowTime.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
                       </div>
                     </div>
+                  </div>
+                )}
+                {mobileHourRows.map((row) => {
+                  if (row.type === "collapsed") {
+                    return (
+                      <div
+                        key={`collapsed-${row.key}`}
+                        className="grid border-b last:border-b-0 bg-slate-50"
+                        style={{
+                          minHeight: `${HOUR_ROW_HEIGHT_PX}px`,
+                          gridTemplateColumns: `minmax(${timeRailMin}px, ${timeRailWidth}px) repeat(${visibleArtists.length}, minmax(${isMobile ? 140 : 180}px, 1fr))`,
+                        }}
+                      >
+                        <div className="px-3 border-r bg-gray-50" />
+                        {visibleArtists.map((artist) => (
+                          <div key={artist.id} className="border-r last:border-r-0 flex items-center justify-center">
+                            {artist.id === row.artistId ? (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setExpandedUnavailableBlocks((prev) => {
+                                    const next = new Set(prev)
+                                    next.add(row.key)
+                                    return next
+                                  })
+                                }}
+                              >
+                                Show {row.hiddenHours} more hours unavailable
+                              </Button>
+                            ) : null}
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  }
 
-                    {/* Artist columns */}
-                    {visibleArtists.map((artist) => (
-                      <div key={artist.id} className="border-r last:border-r-0 relative">
-                        {/* 15-minute subdivisions */}
-                        <div className="grid grid-rows-4 h-[120px]">
-                          {[0, 0.25, 0.5, 0.75].map((quarterHour) => {
-                            const time = hour + quarterHour
+                  const hour = row.hour
+                  return (
+                    <div
+                      key={hour}
+                      className="grid border-b last:border-b-0"
+                      style={{
+                        minHeight: `${HOUR_ROW_HEIGHT_PX}px`,
+                        gridTemplateColumns: `minmax(${timeRailMin}px, ${timeRailWidth}px) repeat(${visibleArtists.length}, minmax(${isMobile ? 140 : 180}px, 1fr))`,
+                      }}
+                    >
+                      {/* Time label */}
+                      <div className="px-3 border-r bg-gray-50 flex items-start">
+                        <div className="pt-1 text-left leading-none">
+                          <div className="text-[13px] font-semibold text-gray-900">
+                            {formatTime(hour).replace(":00", "")}
+                          </div>
+                          <div className="text-[10px] uppercase tracking-widest text-gray-500">
+                            {hour >= 12 ? "pm" : "am"}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Artist columns */}
+                      {visibleArtists.map((artist) => (
+                        <div key={artist.id} className="border-r last:border-r-0 relative">
+                          {/* 30-minute subdivisions */}
+                          <div
+                            className="grid"
+                            style={{
+                              height: `${HOUR_ROW_HEIGHT_PX}px`,
+                              gridTemplateRows: `repeat(${SLOTS_PER_HOUR}, minmax(0, 1fr))`,
+                            }}
+                          >
+                            {Array.from({ length: SLOTS_PER_HOUR }, (_, index) => index * SLOT_HOURS).map((slotOffset) => {
+                              const time = hour + slotOffset
                             const slotAppointments = getAppointmentsStartingInSlot(artist.id, time)
                             const slotStatus = getSlotStatus(artist.id, time)
-                            const available = slotStatus === "available"
+                            const isBookable = isAvailable(artist.id, time)
                             const isDragSelected = isInDragSelection(artist.id, time)
                             const isTarget = isDropTarget(artist.id, time)
+                            const isUnavailable = isUnavailableStatus(slotStatus)
+                            const timeKey = Number(time.toFixed(2))
+                            const showUnavailableLabel = isUnavailable && unavailableMidpoints.get(artist.id)?.has(timeKey)
+                            const selectionStart =
+                              dragSelection.isDragging &&
+                              dragSelection.artistId === artist.id &&
+                              dragSelection.startTime !== null &&
+                              dragSelection.currentTime !== null
+                                ? Math.min(dragSelection.startTime, dragSelection.currentTime)
+                                : null
+                            const selectionEnd =
+                              dragSelection.isDragging &&
+                              dragSelection.artistId === artist.id &&
+                              dragSelection.startTime !== null &&
+                              dragSelection.currentTime !== null
+                                ? Math.max(dragSelection.startTime, dragSelection.currentTime) + SLOT_HOURS
+                                : null
+                            const showRangeLabel =
+                              isDragSelected &&
+                              selectionStart !== null &&
+                              selectionEnd !== null &&
+                              time === selectionStart
 
-                            return (
-                              <div
-                                key={quarterHour}
-                                className={`border-b last:border-b-0 p-1 transition-all cursor-pointer relative group touch-none ${getSlotBackgroundColor(
-                                  slotStatus,
-                                  isDragSelected,
-                                  isTarget,
-                                )} ${available ? "hover:bg-green-100" : ""} ${isDragSelected ? "border-2 border-blue-400" : ""
-                                  } ${isDraggingAppointment && available && !isTarget
-                                    ? "hover:bg-blue-100 hover:border-2 hover:border-blue-300"
-                                    : ""
+                              return (
+                                <div
+                                  key={slotOffset}
+                                  className={`border-b last:border-b-0 p-1 transition-all relative group touch-none ${getSlotBackgroundColor(
+                                    slotStatus,
+                                    isDragSelected,
+                                    isTarget,
+                                  )} ${isBookable ? "cursor-pointer hover:bg-green-100" : "cursor-not-allowed"} ${
+                                    isDragSelected ? "border-2 border-blue-400" : ""
+                                  } ${
+                                    isDraggingAppointment && isBookable && !isTarget
+                                      ? "hover:bg-blue-100 hover:border-2 hover:border-blue-300"
+                                      : ""
                                   }`}
-                                data-slot="true"
-                                data-artist-id={artist.id}
-                                data-time={time}
-                                onClick={() =>
-                                  !dragSelection.isDragging &&
-                                  !isDraggingAppointment &&
-                                  handleSlotClick(artist.id, time)
-                                }
-                                onMouseDown={(e) => !isDraggingAppointment && handleMouseDown(artist.id, time, e)}
-                                onTouchStart={(e) => !isDraggingAppointment && handleTouchStart(artist.id, time, e)}
-                                onMouseEnter={() => !isDraggingAppointment && handleMouseEnter(artist.id, time)}
-                                onDragOver={(e) => handleSlotDragOver(artist.id, time, e)}
-                                onDragLeave={handleSlotDragLeave}
-                                onDrop={(e) => handleSlotDrop(artist.id, time, e)}
-                              >
+                                  style={isUnavailable ? getUnavailableStyle(time) : undefined}
+                                  data-slot="true"
+                                  data-artist-id={artist.id}
+                                  data-time={time}
+                                  title={formatTime(time)}
+                                  onClick={() =>
+                                    isBookable &&
+                                    !dragSelection.isDragging &&
+                                    !isDraggingAppointment &&
+                                    handleSlotClick(artist.id, time)
+                                  }
+                                  onMouseDown={(e) =>
+                                    isBookable && !isDraggingAppointment && handleMouseDown(artist.id, time, e)
+                                  }
+                                  onTouchStart={(e) =>
+                                    isBookable && !isDraggingAppointment && handleTouchStart(artist.id, time, e)
+                                  }
+                                  onMouseEnter={() => !isDraggingAppointment && handleMouseEnter(artist.id, time)}
+                                  onDragOver={(e) => handleSlotDragOver(artist.id, time, e)}
+                                  onDragLeave={handleSlotDragLeave}
+                                  onDrop={(e) => handleSlotDrop(artist.id, time, e)}
+                                >
                                 {/* Time indicator for all time marks - show on hover */}
-                                <div className="absolute left-1 top-0 text-xs text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                                <div className="absolute left-1 top-0 text-[11px] text-gray-700 bg-white/90 border border-gray-200 rounded px-1.5 py-0.5 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity z-20 pointer-events-none">
                                   {formatTime(time)}
                                 </div>
 
-                                {available && !isDragSelected && (
+                                {isBookable && !isDragSelected && (
                                   <div className="absolute inset-1 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                                     <Plus className="h-4 w-4 text-green-600" />
                                   </div>
                                 )}
 
-                                {/* Drag selection indicator */}
-                                {isDragSelected && available && (
-                                  <div className="absolute inset-1 flex items-center justify-center">
-                                    <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
+                                {showRangeLabel && (
+                                  <div className="absolute left-2 top-1 z-20 rounded-full bg-blue-600/90 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm">
+                                    {formatTime(selectionStart)}–{formatTime(selectionEnd)}
                                   </div>
                                 )}
 
@@ -1462,19 +2031,15 @@ export default function ScheduleClient({
                                   </div>
                                 )} */}
 
-                                {slotStatus === "shop-closed" && quarterHour === 0 && (
+                                {showUnavailableLabel && (
                                   <div className="absolute inset-1 flex items-center justify-center">
-                                    <span className="text-xs text-gray-500 text-center">
-                                      Shop
-                                      <br />
-                                      Closed
-                                    </span>
+                                    <span className="text-sm font-medium text-gray-500 text-center">Not Available</span>
                                   </div>
                                 )}
 
                                 {/* Drop zone indicator when dragging */}
                                 {isDraggingAppointment &&
-                                  available &&
+                                  isBookable &&
                                   dragOverSlot?.artistId === artist.id &&
                                   dragOverSlot?.time === time && (
                                     <div className="absolute inset-1 border-2 border-dashed border-blue-400 rounded opacity-100 transition-opacity flex items-center justify-center">
@@ -1487,19 +2052,28 @@ export default function ScheduleClient({
                                     key={appointment.id}
                                     className={`absolute inset-1 rounded-lg p-2 border shadow-sm overflow-hidden ${getStatusColor(
                                       appointment.status,
-                                    )} group cursor-move hover:shadow-md transition-all z-10 ${dragSelection.isDragging ? "pointer-events-none" : ""
-                                      } ${isDraggingAppointment && draggedAppointment?.id === appointment.id
-                                      ? "opacity-50 scale-105"
-                                      : ""
-                                      }`}
+                                    )} group cursor-move hover:shadow-md transition-all z-10 ${
+                                      dragSelection.isDragging ? "pointer-events-none" : ""
+                                    } ${
+                                      isDraggingAppointment && draggedAppointment?.id === appointment.id
+                                        ? "opacity-50 scale-105"
+                                        : ""
+                                    }`}
                                     style={{
-                                      height: `calc(${((appointment.duration || 60) / 15) * 30}px - 8px)`,
+                                      height: `calc(${((appointment.duration || 60) / SLOT_MINUTES) * SLOT_HEIGHT_PX}px - 8px)`,
                                     }}
+                                    title={`${formatTime(timeToDecimal(appointment.start_time))}–${formatTime(
+                                      timeToDecimal(appointment.start_time) + (appointment.duration || 60) / 60,
+                                    )}`}
                                     draggable={true}
                                     onDragStart={(e) => handleAppointmentDragStart(appointment, e)}
                                     onDragEnd={handleAppointmentDragEnd}
                                     onMouseDown={(e) => e.stopPropagation()} // Prevent clash with new appointment drag
-                                    onClick={(e) => {
+                                    onMouseUp={(e) => {
+                                      if (e.button !== 0) return
+                                      if (suppressViewOpenRef.current) return
+                                      const target = e.target as HTMLElement
+                                      if (target.closest("[data-appointment-menu]")) return
                                       e.stopPropagation()
                                       openViewDialog(appointment)
                                     }}
@@ -1508,13 +2082,16 @@ export default function ScheduleClient({
                                       <div className="flex-1 min-w-0">
                                         <div className="font-semibold text-xs mb-1 truncate">
                                           {appointment.clients?.full_name}
+                                          <span className="ml-2 font-normal text-[10px] text-gray-600">
+                                            {formatTime(timeToDecimal(appointment.start_time))}–
+                                            {formatTime(
+                                              timeToDecimal(appointment.start_time) +
+                                                (appointment.duration || 60) / 60,
+                                            )}
+                                          </span>
                                         </div>
                                         <div className="text-xs mb-1 opacity-90 truncate">
                                           {appointment.services?.name}
-                                        </div>
-                                        <div className="flex items-center gap-1 text-xs opacity-75 mb-1">
-                                          <Clock className="h-2 w-2" />
-                                          {formatTime(timeToDecimal(appointment.start_time))}
                                         </div>
                                         <div className="flex items-center justify-between">
                                           {appointment.price && (
@@ -1536,6 +2113,8 @@ export default function ScheduleClient({
                                             size="sm"
                                             className="opacity-0 group-hover:opacity-100 h-4 w-4 p-0"
                                             onClick={(e) => e.stopPropagation()}
+                                            onMouseUp={(e) => e.stopPropagation()}
+                                            data-appointment-menu
                                           >
                                             <MoreHorizontal className="h-2 w-2" />
                                           </Button>
@@ -1576,6 +2155,9 @@ export default function ScheduleClient({
                                             )}
                                           <DropdownMenuItem
                                             onClick={() => openDeleteDialog(appointment)}
+                                            onMouseDown={() => {
+                                              suppressViewOpenRef.current = true
+                                            }}
                                             className="text-red-600"
                                           >
                                             <Trash2 className="mr-2 h-4 w-4" />
@@ -1589,137 +2171,146 @@ export default function ScheduleClient({
                                     </div>
                                   </div>
                                 ))}
-                              </div>
-                            )
-                          })}
+                                </div>
+                              )
+                            })}
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </ScrollArea>
-            </CardContent>
-          </Card>
-
-          {/* Summary Stats */}
-          <div className="grid gap-4 md:grid-cols-3">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Appointments ({stats.title})</CardTitle>
-                <CalendarDays className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.appointments}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Revenue ({stats.title})</CardTitle>
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">${stats.revenue.toLocaleString()}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Booked Hours ({stats.title})</CardTitle>
-                <Clock className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.bookedHours}</div>
-              </CardContent>
-            </Card>
-          </div>
-        </>
-      ) : (
-        <>
-          {/* Stats Cards for List View */}
-          <div className="grid gap-4 md:grid-cols-3">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Appointments ({stats.title})</CardTitle>
-                <CalendarDays className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.appointments}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Revenue ({stats.title})</CardTitle>
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">${stats.revenue.toLocaleString()}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Booked Hours ({stats.title})</CardTitle>
-                <Clock className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.bookedHours}</div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Filters for List View */}
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex flex-wrap items-center gap-4">
-                <div className="relative flex-1 min-w-[200px]">
-                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search appointments..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-8"
-                  />
-                </div>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-[140px]">
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="confirmed">Confirmed</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="cancelled">Cancelled</SelectItem>
-                    <SelectItem value="completed">Completed</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={artistFilter} onValueChange={setArtistFilter}>
-                  <SelectTrigger className="w-[160px]">
-                    <SelectValue placeholder="Artist" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Artists</SelectItem>
-                    {artists.map((artist) => (
-                      <SelectItem key={artist.id} value={artist.id.toString()}>
-                        {artist.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={dateFilter} onValueChange={setDateFilter}>
-                  <SelectTrigger className="w-[140px]">
-                    <SelectValue placeholder="Date" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Dates</SelectItem>
-                    <SelectItem value="today">Today</SelectItem>
-                    <SelectItem value="tomorrow">Tomorrow</SelectItem>
-                    <SelectItem value="week">This Week</SelectItem>
-                    <SelectItem value="upcoming">Upcoming</SelectItem>
-                    <SelectItem value="past">Past</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Badge variant="secondary">{filteredAppointments.length} results</Badge>
+                      ))}
+                    </div>
+                  )
+                })}
               </div>
             </CardContent>
           </Card>
+        </>
+      ) : viewMode === "list" ? (
+        <>
+          {/* Filters for List View */}
+          {isMobile ? (
+            <div className="rounded-xl border border-slate-200 bg-white">
+              <Button
+                variant="ghost"
+                className="w-full justify-between"
+                onClick={() => setIsFiltersOpen((prev) => !prev)}
+              >
+                <span className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                  <SlidersHorizontal className="h-4 w-4" />
+                  Filters
+                </span>
+                <span className="text-xs text-slate-500">{isFiltersOpen ? "Hide" : "Show"}</span>
+              </Button>
+              {isFiltersOpen && (
+                <div className="p-4 pt-0">
+                  <div className="flex flex-col gap-3">
+                    <div className="relative">
+                      <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search appointments..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-8"
+                      />
+                    </div>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Status</SelectItem>
+                        <SelectItem value="confirmed">Confirmed</SelectItem>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                        <SelectItem value="completed">Completed</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select value={artistFilter} onValueChange={setArtistFilter}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Artist" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Artists</SelectItem>
+                        {artists.map((artist) => (
+                          <SelectItem key={artist.id} value={artist.id.toString()}>
+                            {artist.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select value={dateFilter} onValueChange={setDateFilter}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Date" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Dates</SelectItem>
+                        <SelectItem value="today">Today</SelectItem>
+                        <SelectItem value="tomorrow">Tomorrow</SelectItem>
+                        <SelectItem value="week">This Week</SelectItem>
+                        <SelectItem value="upcoming">Upcoming</SelectItem>
+                        <SelectItem value="past">Past</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Badge variant="secondary">{filteredAppointments.length} results</Badge>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex flex-wrap items-center gap-4">
+                  <div className="relative flex-1 min-w-[200px]">
+                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search appointments..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-8"
+                    />
+                  </div>
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-[140px]">
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="confirmed">Confirmed</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={artistFilter} onValueChange={setArtistFilter}>
+                    <SelectTrigger className="w-[160px]">
+                      <SelectValue placeholder="Artist" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Artists</SelectItem>
+                      {artists.map((artist) => (
+                        <SelectItem key={artist.id} value={artist.id.toString()}>
+                          {artist.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={dateFilter} onValueChange={setDateFilter}>
+                    <SelectTrigger className="w-[140px]">
+                      <SelectValue placeholder="Date" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Dates</SelectItem>
+                      <SelectItem value="today">Today</SelectItem>
+                      <SelectItem value="tomorrow">Tomorrow</SelectItem>
+                      <SelectItem value="week">This Week</SelectItem>
+                      <SelectItem value="upcoming">Upcoming</SelectItem>
+                      <SelectItem value="past">Past</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Badge variant="secondary">{filteredAppointments.length} results</Badge>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Appointments List */}
           <Card>
@@ -1749,10 +2340,8 @@ export default function ScheduleClient({
                             <div className="flex items-center gap-4">
                               <Avatar className="h-10 w-10">
                                 <AvatarImage
-                                  src={`/placeholder.svg?height=40&width=40&text=${artist?.name
-                                    .split(" ")
-                                    .map((n) => n[0])
-                                    .join("")}`}
+                                  src={artist ? getArtistAvatar(artist) : "/placeholder-user.jpg"}
+                                  alt={artist?.name || "Artist"}
                                 />
                                 <AvatarFallback>
                                   {artist?.name
@@ -1795,19 +2384,25 @@ export default function ScheduleClient({
                                 <div className="text-sm text-muted-foreground">
                                   <span className="font-medium">{appointment.services?.name}</span>
                                   {appointment.deposit_paid && (
-                                    <span className="ml-2">• Deposit: ${appointment.deposit_paid}</span>
+                                    <span className="ml-2">- Deposit: ${appointment.deposit_paid}</span>
                                   )}
                                 </div>
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
                               {getStatusIcon(appointment.status)}
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="sm">
-                                    <MoreHorizontal className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={(e) => e.stopPropagation()}
+                                        onMouseUp={(e) => e.stopPropagation()}
+                                        data-appointment-menu
+                                      >
+                                        <MoreHorizontal className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
                                   <DropdownMenuItem onClick={() => openViewDialog(appointment)}>
                                     <Eye className="mr-2 h-4 w-4" />
@@ -1842,6 +2437,9 @@ export default function ScheduleClient({
                                     )}
                                   <DropdownMenuItem
                                     onClick={() => openDeleteDialog(appointment)}
+                                    onMouseDown={() => {
+                                      suppressViewOpenRef.current = true
+                                    }}
                                     className="text-red-600"
                                   >
                                     <Trash2 className="mr-2 h-4 w-4" />
@@ -1866,133 +2464,364 @@ export default function ScheduleClient({
             </CardContent>
           </Card>
         </>
+      ) : (
+        <div className="space-y-4">
+          <div className="rounded-xl border border-slate-200 bg-white p-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="text-sm font-semibold text-slate-700">Stats</div>
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <Badge variant="secondary">Today</Badge>
+              {statsFilters.map((label) => (
+                <Badge key={label} variant="outline">
+                  {label}
+                </Badge>
+              ))}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsFiltersOpen((prev) => !prev)}
+              >
+                Edit filters
+              </Button>
+            </div>
+          </div>
+          {isFiltersOpen && (
+            <div className="rounded-xl border border-slate-200 bg-white p-4">
+              <div className="flex flex-col gap-3">
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="confirmed">Confirmed</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={artistFilter} onValueChange={setArtistFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Artist" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Artists</SelectItem>
+                    {artists.map((artist) => (
+                      <SelectItem key={artist.id} value={artist.id.toString()}>
+                        {artist.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={dateFilter} onValueChange={setDateFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Date" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Dates</SelectItem>
+                    <SelectItem value="today">Today</SelectItem>
+                    <SelectItem value="tomorrow">Tomorrow</SelectItem>
+                    <SelectItem value="week">This Week</SelectItem>
+                    <SelectItem value="upcoming">Upcoming</SelectItem>
+                    <SelectItem value="past">Past</SelectItem>
+                  </SelectContent>
+                </Select>
+                <div className="flex justify-end">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setStatusFilter("all")
+                      setArtistFilter("all")
+                      setDateFilter("today")
+                    }}
+                  >
+                    Reset filters
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+          <div className="grid gap-4 md:grid-cols-3">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Appointments ({stats.title})</CardTitle>
+                <CalendarDays className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.appointments}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Revenue ({stats.title})</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">${stats.revenue.toLocaleString()}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Booked Hours ({stats.title})</CardTitle>
+                <Clock className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.bookedHours}</div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       )}
 
       {/* View Appointment Dialog */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Appointment Details</DialogTitle>
-            <DialogDescription>View appointment information and client details</DialogDescription>
+        <DialogContent className="max-w-3xl w-[95vw] sm:w-full max-h-[90vh] overflow-y-auto bg-white/95 backdrop-blur border border-slate-200/80 shadow-2xl sm:rounded-2xl p-6 sm:p-8">
+          <DialogHeader className="pb-4 border-b border-slate-200/70">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <DialogTitle className="text-xl">Appointment Details</DialogTitle>
+                {selectedAppointment && (
+                  <button
+                    type="button"
+                    className="mt-1 text-xs text-slate-400 hover:text-slate-500 transition text-left"
+                    onClick={() => {
+                      navigator.clipboard.writeText(selectedAppointment.id)
+                      toast.success("Appointment ID copied")
+                    }}
+                  >
+                    ID: {selectedAppointment.id}
+                  </button>
+                )}
+              </div>
+              {selectedAppointment && (
+                <Badge className={getStatusColor(selectedAppointment.status)}>{selectedAppointment.status}</Badge>
+              )}
+            </div>
           </DialogHeader>
           {selectedAppointment && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-sm font-medium text-gray-500">Client</Label>
-                  <p className="text-lg font-semibold">{selectedAppointment.clients?.full_name}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-500">Status</Label>
-                  <Badge className={getStatusColor(selectedAppointment.status)}>{selectedAppointment.status}</Badge>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-sm font-medium text-gray-500">Artist</Label>
-                  <p>{selectedAppointment.artists?.name}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-500">Service</Label>
-                  <p>{selectedAppointment.services?.name}</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <Label className="text-sm font-medium text-gray-500">Date</Label>
-                  <p>{formatDate(selectedAppointment.appointment_date)}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-500">Time</Label>
-                  <p>
-                    {formatTime(timeToDecimal(selectedAppointment.start_time))} -{" "}
-                    {formatTime(
-                      timeToDecimal(selectedAppointment.start_time) +
-                      (selectedAppointment.duration || 0) / 60,
-                    )}
-                  </p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-500">Duration</Label>
-                  <p>
-                    {selectedAppointment.duration} minute
-                    {selectedAppointment.duration !== 1 ? "s" : ""}
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-sm font-medium text-gray-500">Phone</Label>
-                  <p>{selectedAppointment.clients?.phone}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-500">Email</Label>
-                  <p>{selectedAppointment.clients?.email || "Not provided"}</p>
+            <div className="grid gap-6 pt-4 lg:grid-cols-[280px_1fr]">
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-5 shadow-sm">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-14 w-14 border border-white shadow-sm">
+                      <AvatarImage src={selectedAppointment.clients?.avatar_url} />
+                      <AvatarFallback>
+                        {selectedAppointment.clients?.full_name
+                          ?.split(" ")
+                          .map((part) => part[0])
+                          .join("") || "CL"}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <div className="text-base font-semibold">{selectedAppointment.clients?.full_name}</div>
+                      <div className="text-xs text-slate-500">{selectedAppointment.clients?.email}</div>
+                      {selectedAppointment.clients?.phone && (
+                        <div className="text-xs text-slate-500">{selectedAppointment.clients?.phone}</div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="mt-4 space-y-2 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500">Date</span>
+                      <span className="font-medium">{formatDate(selectedAppointment.appointment_date)}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500">Time</span>
+                      <span className="font-medium">
+                        {formatTime(timeToDecimal(selectedAppointment.start_time))} -{" "}
+                        {formatTime(
+                          timeToDecimal(selectedAppointment.start_time) +
+                          (selectedAppointment.duration || 0) / 60,
+                        )}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500">Duration</span>
+                      <span className="font-medium">{formatDuration(selectedAppointment.duration)}</span>
+                    </div>
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Badge className={getStatusColor(selectedAppointment.status)}>{selectedAppointment.status}</Badge>
+                    <Badge className={getPaymentStatusColor(selectedAppointment.payment_status || "unpaid")}>
+                      {selectedAppointment.payment_status || "unpaid"}
+                    </Badge>
+                  </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <Label className="text-sm font-medium text-gray-500">Price</Label>
-                  <p className="text-lg font-semibold">${selectedAppointment.price}</p>
+              <div className="space-y-4">
+                <div
+                  ref={paymentSectionRef}
+                  className={`rounded-2xl border bg-white p-5 transition-shadow ${
+                    highlightPaymentCard ? "border-emerald-300 shadow-[0_0_0_2px_rgba(16,185,129,0.25)]" : "border-slate-200"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-sm font-semibold text-slate-700">Service & Payment</div>
+                      <div className="mt-1 text-base font-medium">{selectedAppointment.services?.name}</div>
+                      <div className="text-xs text-slate-500">
+                        {selectedAppointment.artists?.name} - {formatDuration(selectedAppointment.duration)}
+                      </div>
+                    </div>
+                    <div className="text-sm font-semibold">${selectedAppointment.price}</div>
+                  </div>
+                  <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+                    <div className="grid gap-2 text-slate-600">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-slate-500">Price</span>
+                      <span className="font-semibold text-slate-900">
+                        ${selectedAppointment.price || 0}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-slate-500">Deposit</span>
+                      <span className="font-semibold text-slate-900">- ${selectedAppointment.deposit_paid || 0}</span>
+                    </div>
+                    {(() => {
+                      const paymentsTotal = getPaymentsTotal(selectedAppointment)
+                      const depositPaid = selectedAppointment.deposit_paid || 0
+                      const otherPayments = paymentsTotal >= depositPaid ? paymentsTotal - depositPaid : paymentsTotal
+                      if (otherPayments <= 0) return null
+                      return (
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-slate-500">Payments</span>
+                          <span className="font-semibold text-slate-900">- ${otherPayments}</span>
+                        </div>
+                      )
+                    })()}
+                    {(() => {
+                      const payments = selectedAppointment.payments || []
+                      if (!payments.length) return null
+                      const sortedPayments = [...payments].sort(
+                        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+                      )
+                      return (
+                        <div className="rounded-lg border border-slate-200 bg-white p-2 text-xs text-slate-600">
+                          <div className="flex items-center justify-between">
+                            <span>Payments</span>
+                            <span className="font-semibold">{sortedPayments.length}</span>
+                          </div>
+                          <div className="mt-2 space-y-2">
+                            {sortedPayments.map((payment) => {
+                              const shortRef = payment.reference
+                                ? `${payment.reference.slice(0, 6)}...${payment.reference.slice(-4)}`
+                                : null
+                              return (
+                                <div key={payment.id} className="rounded-md border border-slate-200 p-2">
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-medium">${payment.amount}</span>
+                                    <span className="text-slate-500">
+                                      {new Date(payment.created_at).toLocaleDateString()}
+                                    </span>
+                                  </div>
+                                  <div className="mt-1 flex items-center justify-between">
+                                    <span className="text-slate-500">Method</span>
+                                    <span className="uppercase">{payment.method || "N/A"}</span>
+                                  </div>
+                                  {payment.card_brand && payment.card_last4 && (
+                                    <div className="mt-1 flex items-center justify-between">
+                                      <span className="text-slate-500">Card</span>
+                                      <span className="uppercase">
+                                        {payment.card_brand} **** {payment.card_last4}
+                                      </span>
+                                    </div>
+                                  )}
+                                  <div className="mt-1 flex items-center justify-between">
+                                    <span className="text-slate-500">Reference</span>
+                                    {shortRef ? (
+                                      <span className="text-slate-900">{shortRef}</span>
+                                    ) : (
+                                      <span className="text-slate-400">-</span>
+                                    )}
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )
+                    })()}
+                    <div className="border-t border-slate-200 pt-2 flex items-center justify-between">
+                      <span className="text-xs text-slate-500">Balance due</span>
+                      <span className="font-semibold text-emerald-700">${getBalanceDue(selectedAppointment)}</span>
+                    </div>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-500">Deposit Paid</Label>
-                  <p>${selectedAppointment.deposit_paid || 0}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-500">Payment Status</Label>
-                  <Badge className={getPaymentStatusColor(selectedAppointment.payment_status || "unpaid")}>
-                    {selectedAppointment.payment_status || "unpaid"}
-                  </Badge>
-                </div>
-              </div>
 
-              {selectedAppointment.notes && (
-                <div>
-                  <Label className="text-sm font-medium text-gray-500">Notes</Label>
-                  <p className="mt-1 p-3 bg-gray-50 rounded-md">{selectedAppointment.notes}</p>
-                </div>
-              )}
-
-              <div>
-                <Label className="text-sm font-medium text-gray-500">Created</Label>
-                <p>{new Date(selectedAppointment.created_at).toLocaleString()}</p>
-              </div>
-
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setIsViewDialogOpen(false)}>
-                  Close
-                </Button>
-                {selectedAppointment.payment_status !== "paid" && (
-                  <Button onClick={() => {
-                    setIsViewDialogOpen(false)
-                    openCheckoutDialog(selectedAppointment)
-                  }} className="bg-green-600 hover:bg-green-700">
-                    Checkout
-                  </Button>
+                {selectedAppointment.notes && (
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-5">
+                    <div className="text-sm font-semibold text-slate-700">Notes</div>
+                    <p className="mt-2 text-sm text-slate-700">{selectedAppointment.notes}</p>
+                  </div>
                 )}
-                <Button onClick={() => openEditDialog(selectedAppointment)}>Edit</Button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="icon">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => updateAppointmentStatus(selectedAppointment.id, "cancelled")} className="text-red-600">
-                      <XCircle className="mr-2 h-4 w-4" />
-                      Cancel
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => updateAppointmentStatus(selectedAppointment.id, "cancelled")} className="text-orange-600">
-                      <AlertCircle className="mr-2 h-4 w-4" />
-                      No Show
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+
+                <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                  <div className="text-xs text-slate-500">
+                    Created {new Date(selectedAppointment.created_at).toLocaleString()}
+                  </div>
+                  <div className="mt-4 flex items-center gap-3">
+                    {(() => {
+                      const balanceDue = getBalanceDue(selectedAppointment)
+                      const isFullyPaid = balanceDue === 0
+                      const isPending = selectedAppointment.status === "pending"
+                      const isConfirmed =
+                        selectedAppointment.status === "confirmed" ||
+                        selectedAppointment.status === "in-progress"
+
+                      if ((isPending || isConfirmed) && balanceDue > 0) {
+                        return (
+                          <Button
+                            className="flex-1 bg-green-600 hover:bg-green-700"
+                            onClick={() => {
+                              setIsViewDialogOpen(false)
+                              openCheckoutDialog(selectedAppointment)
+                            }}
+                          >
+                            Checkout
+                          </Button>
+                        )
+                      }
+
+                      if (isFullyPaid) {
+                        return (
+                          <Button
+                            className="flex-1"
+                            onClick={() => {
+                              paymentSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+                              setHighlightPaymentCard(true)
+                              window.setTimeout(() => setHighlightPaymentCard(false), 1400)
+                            }}
+                          >
+                            View Sale
+                          </Button>
+                        )
+                      }
+
+                      return (
+                        <Button
+                          className="flex-1"
+                          onClick={() => {
+                            setIsViewDialogOpen(false)
+                            openCheckoutDialog(selectedAppointment)
+                          }}
+                        >
+                          Checkout
+                        </Button>
+                      )
+                    })()}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="icon">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => setIsViewDialogOpen(false)}>Close</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -2006,18 +2835,21 @@ export default function ScheduleClient({
           if (!open) {
             setIsNewAppointmentDialogOpen(false)
             setIsEditDialogOpen(false)
+            setIsViewDialogOpen(false)
             resetForm()
           }
         }}
       >
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{isEditDialogOpen ? "Edit Appointment" : "New Appointment"}</DialogTitle>
-            <DialogDescription>
+        <DialogContent className="max-w-3xl bg-white/95 backdrop-blur border border-slate-200/80 shadow-2xl sm:rounded-2xl p-8">
+          <DialogHeader className="pb-4 border-b border-slate-200/70">
+            <DialogTitle className="text-xl">
+              {isEditDialogOpen ? "Edit Appointment" : "New Appointment"}
+            </DialogTitle>
+            <DialogDescription className="text-slate-500">
               {isEditDialogOpen ? "Update appointment details" : "Create a new appointment"}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-6 pt-2">
             <div>
               <Label htmlFor="client_id">Client *</Label>
               <Select
@@ -2112,11 +2944,14 @@ export default function ScheduleClient({
                   <SelectContent>
                     {services.map((service) => (
                       <SelectItem key={service.id} value={service.id.toString()}>
-                        {service.name} ({service.duration} min)
+                        {service.name} ({formatDuration(service.duration ?? service.duration_minutes)})
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                {formData.duration ? (
+                  <p className="mt-1 text-xs text-muted-foreground">Duration: {formatDuration(formData.duration)}</p>
+                ) : null}
               </div>
             </div>
 
@@ -2181,8 +3016,38 @@ export default function ScheduleClient({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="confirmed">Confirmed</SelectItem>
+                    {(() => {
+                      const paymentsTotal = getPaymentsTotal(selectedAppointment)
+                      const price = formData.price ?? selectedAppointment?.price ?? 0
+                      const depositPaid = formData.deposit_paid ?? selectedAppointment?.deposit_paid ?? 0
+                      const totalPaid = paymentsTotal >= depositPaid ? paymentsTotal : depositPaid + paymentsTotal
+                      const balanceDue = Math.max(0, price - totalPaid)
+                      const hasPayment = totalPaid > 0
+
+                      if (hasPayment) {
+                        return (
+                          <>
+                            <SelectItem value="confirmed">Confirmed</SelectItem>
+                            {balanceDue === 0 && <SelectItem value="completed">Completed</SelectItem>}
+                          </>
+                        )
+                      }
+
+                      return (
+                        <>
+                          <SelectItem value="pending">Pending</SelectItem>
+                          <SelectItem value="confirmed">Confirmed</SelectItem>
+                          <SelectItem value="cancelled">Cancelled</SelectItem>
+                          <SelectItem value="no-show">No Show</SelectItem>
+                          {balanceDue === 0 && (
+                            <>
+                              <SelectItem value="in-progress">In Progress</SelectItem>
+                              <SelectItem value="completed">Completed</SelectItem>
+                            </>
+                          )}
+                        </>
+                      )
+                    })()}
                   </SelectContent>
                 </Select>
               </div>
@@ -2205,6 +3070,7 @@ export default function ScheduleClient({
                 onClick={() => {
                   setIsNewAppointmentDialogOpen(false)
                   setIsEditDialogOpen(false)
+                  setIsViewDialogOpen(false)
                   resetForm()
                 }}
               >
@@ -2247,14 +3113,16 @@ export default function ScheduleClient({
 
       {/* Checkout Dialog */}
       <Dialog open={isCheckoutDialogOpen} onOpenChange={setIsCheckoutDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Checkout - {selectedAppointment?.clients?.full_name}</DialogTitle>
-            <DialogDescription>Select payment method to complete the transaction</DialogDescription>
+        <DialogContent className="max-w-xl bg-white/95 backdrop-blur border border-slate-200/80 shadow-2xl sm:rounded-2xl p-6">
+          <DialogHeader className="pb-3 border-b border-slate-200/70">
+            <DialogTitle className="text-lg">Checkout</DialogTitle>
+            <DialogDescription className="text-slate-500">
+              {selectedAppointment?.clients?.full_name} - Select payment method
+            </DialogDescription>
           </DialogHeader>
           {selectedAppointment && (
             <div className="space-y-4">
-              <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2">
                 <div className="flex justify-between">
                   <span>Service:</span>
                   <span className="font-medium">{selectedAppointment.services?.name}</span>
@@ -2267,10 +3135,22 @@ export default function ScheduleClient({
                   <span>Deposit Paid:</span>
                   <span className="font-medium">${selectedAppointment.deposit_paid || 0}</span>
                 </div>
+                {(() => {
+                  const paymentsTotal = getPaymentsTotal(selectedAppointment)
+                  const depositPaid = selectedAppointment.deposit_paid || 0
+                  const otherPayments = paymentsTotal >= depositPaid ? paymentsTotal - depositPaid : paymentsTotal
+                  if (otherPayments <= 0) return null
+                  return (
+                    <div className="flex justify-between">
+                      <span>Payments:</span>
+                      <span className="font-medium">-${otherPayments}</span>
+                    </div>
+                  )
+                })()}
                 <Separator />
                 <div className="flex justify-between text-lg font-bold">
                   <span>Balance Due:</span>
-                  <span>${(selectedAppointment.price || 0) - (selectedAppointment.deposit_paid || 0)}</span>
+                  <span>${getBalanceDue(selectedAppointment)}</span>
                 </div>
               </div>
 
@@ -2301,23 +3181,107 @@ export default function ScheduleClient({
               </div>
             </div>
           )}
+          {cardClientSecret && (
+            <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
+              <Elements stripe={stripePromise} options={{ clientSecret: cardClientSecret }}>
+                <CardPaymentForm
+                  clientSecret={cardClientSecret}
+                  amount={paymentAmount}
+                  onSuccess={async (intentId) => {
+                    if (!selectedAppointment) return
+                    const detailsResponse = await fetch("/api/stripe/intent-details", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        appointmentId: selectedAppointment.id,
+                        paymentIntentId: intentId,
+                      }),
+                    })
+                    const details = detailsResponse.ok ? await detailsResponse.json() : {}
+                    await completePayment("card", paymentAmount, 0, details)
+                    setCardClientSecret(null)
+                    setCardPaymentIntentId(null)
+                    setIsCheckoutDialogOpen(false)
+                  }}
+                  onError={(message) => toast.error(message)}
+                />
+              </Elements>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Partial Payment Amount Dialog */}
+      <Dialog open={isPartialPaymentDialogOpen} onOpenChange={setIsPartialPaymentDialogOpen}>
+        <DialogContent className="max-w-sm bg-white/95 backdrop-blur border border-slate-200/80 shadow-2xl sm:rounded-2xl p-6">
+          <DialogHeader className="pb-3 border-b border-slate-200/70">
+            <DialogTitle className="text-lg">Partial payment</DialogTitle>
+            <DialogDescription className="text-slate-500">
+              Enter a custom amount to charge.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedAppointment && (
+            <div className="space-y-4">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Balance Due</span>
+                  <span className="font-semibold">
+                    ${getBalanceDue(selectedAppointment)}
+                  </span>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="partialAmount">Amount</Label>
+                <Input
+                  id="partialAmount"
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  max={getBalanceDue(selectedAppointment)}
+                  value={paymentAmount}
+                  onChange={(e) => setPaymentAmount(Number.parseFloat(e.target.value) || 0)}
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setIsPartialPaymentDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    const balanceDue = getBalanceDue(selectedAppointment)
+                    if (paymentAmount <= 0 || paymentAmount > balanceDue) {
+                      toast.error("Enter a valid partial amount.")
+                      return
+                    }
+                    setIsPartialPaymentDialogOpen(false)
+                    setIsCheckoutDialogOpen(true)
+                    handleStripeCheckout(paymentAmount)
+                  }}
+                >
+                  Charge Amount
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
       {/* Cash Payment Dialog */}
       <Dialog open={isCashPaymentDialogOpen} onOpenChange={setIsCashPaymentDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Cash Payment - {selectedAppointment?.clients?.full_name}</DialogTitle>
-            <DialogDescription>Enter cash payment details</DialogDescription>
+        <DialogContent className="max-w-xl bg-white/95 backdrop-blur border border-slate-200/80 shadow-2xl sm:rounded-2xl p-6">
+          <DialogHeader className="pb-3 border-b border-slate-200/70">
+            <DialogTitle className="text-lg">Cash Payment</DialogTitle>
+            <DialogDescription className="text-slate-500">
+              {selectedAppointment?.clients?.full_name} - Enter payment details
+            </DialogDescription>
           </DialogHeader>
           {selectedAppointment && (
             <div className="space-y-4">
-              <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2">
                 <div className="flex justify-between">
                   <span>Balance Due:</span>
                   <span className="font-bold text-lg">
-                    ${(selectedAppointment.price || 0) - (selectedAppointment.deposit_paid || 0)}
+                    ${getBalanceDue(selectedAppointment)}
                   </span>
                 </div>
               </div>
@@ -2359,7 +3323,7 @@ export default function ScheduleClient({
                 </div>
 
                 {cashPaymentData.amountReceived > 0 && (
-                  <div className="bg-green-50 p-4 rounded-lg">
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
                     <div className="flex justify-between items-center">
                       <span>Change Due:</span>
                       <span className="font-bold text-lg">
@@ -2367,7 +3331,7 @@ export default function ScheduleClient({
                         {Math.max(
                           0,
                           cashPaymentData.amountReceived -
-                          ((selectedAppointment.price || 0) - (selectedAppointment.deposit_paid || 0)),
+                          getBalanceDue(selectedAppointment),
                         ).toFixed(2)}
                       </span>
                     </div>
@@ -2382,8 +3346,8 @@ export default function ScheduleClient({
                 <Button
                   onClick={handleCashPayment}
                   disabled={
-                    cashPaymentData.amountReceived <
-                    (selectedAppointment.price || 0) - (selectedAppointment.deposit_paid || 0)
+                    cashPaymentData.amountReceived <= 0 ||
+                    cashPaymentData.amountReceived > getBalanceDue(selectedAppointment)
                   }
                 >
                   Complete Payment
@@ -2394,47 +3358,92 @@ export default function ScheduleClient({
         </DialogContent>
       </Dialog>
 
-      {/* Legend for Calendar View */}
-      {viewMode === "calendar" && (
-        <div className="flex items-center gap-6 text-sm">
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-green-50 border border-green-200 rounded"></div>
-            <span>Available</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-green-100 border border-green-200 rounded"></div>
-            <span>Confirmed</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-yellow-100 border border-yellow-200 rounded"></div>
-            <span>Pending</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-purple-100 border border-purple-200 rounded"></div>
-            <span>In Progress</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-blue-100 border border-blue-200 rounded"></div>
-            <span>Completed</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-red-100 border border-red-200 rounded"></div>
-            <span>Cancelled</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-gray-100 border border-gray-200 rounded"></div>
-            <span>Artist Unavailable</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-gray-200 border border-gray-300 rounded"></div>
-            <span>Shop Closed</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-blue-200 border border-blue-400 rounded"></div>
-            <span>Drag Selection</span>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
+
+const CardPaymentForm = ({
+  clientSecret,
+  amount,
+  onSuccess,
+  onError,
+}: {
+  clientSecret: string
+  amount: number
+  onSuccess: (paymentIntentId: string) => void
+  onError: (message: string) => void
+}) => {
+  const stripe = useStripe()
+  const elements = useElements()
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault()
+    if (!stripe || !elements) return
+
+    if (amount <= 0) {
+      onError("Enter a valid amount to charge.")
+      return
+    }
+
+    const cardElement = elements.getElement(CardElement)
+    if (!cardElement) {
+      onError("Card details are missing.")
+      return
+    }
+
+    setIsSubmitting(true)
+    const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
+      payment_method: {
+        card: cardElement,
+      },
+    })
+
+    if (error) {
+      onError(error.message || "Card payment failed.")
+      setIsSubmitting(false)
+      return
+    }
+
+    if (!paymentIntent?.id) {
+      onError("Payment could not be confirmed.")
+      setIsSubmitting(false)
+      return
+    }
+
+    onSuccess(paymentIntent.id)
+    setIsSubmitting(false)
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+        <CardElement
+          options={{
+            style: {
+              base: {
+                fontSize: "16px",
+                color: "#0f172a",
+                "::placeholder": { color: "#94a3b8" },
+              },
+            },
+          }}
+        />
+      </div>
+      <div className="flex items-center justify-between text-sm text-slate-600">
+        <span>Amount to charge</span>
+        <span className="font-semibold text-slate-900">${amount.toFixed(2)}</span>
+      </div>
+      <Button type="submit" disabled={!stripe || isSubmitting} className="w-full">
+        {isSubmitting ? "Processing..." : "Charge card"}
+      </Button>
+    </form>
+  )
+}
+
+
+
+
+
+
+

@@ -14,7 +14,7 @@ export async function POST(request: Request) {
       return new NextResponse("Unauthorized", { status: 401 })
     }
 
-    const { appointment } = await request.json()
+    const { appointment, amount } = await request.json()
 
     if (!appointment) {
       return new NextResponse("Appointment data is required", { status: 400 })
@@ -24,6 +24,9 @@ export async function POST(request: Request) {
       return new NextResponse("Incomplete appointment data for checkout.", { status: 400 })
     }
 
+    const amountToCharge =
+      typeof amount === "number" && Number.isFinite(amount) && amount > 0 ? amount : appointment.price
+
     const lineItems = [
       {
         price_data: {
@@ -32,7 +35,7 @@ export async function POST(request: Request) {
             name: `Appointment: ${appointment.services.name}`,
             description: `With ${appointment.artists.name} for ${appointment.clients?.full_name || "client"}`,
           },
-          unit_amount: Math.round(appointment.price * 100),
+          unit_amount: Math.round(amountToCharge * 100),
         },
         quantity: 1,
       },

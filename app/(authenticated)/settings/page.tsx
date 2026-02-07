@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { supabase } from "@/lib/supabase-browser"
 import ConnectStripe from "@/components/stripe/ConnectStripe"
 import { Button } from "@/components/ui/button"
@@ -26,7 +26,6 @@ import {
   Bell,
   CreditCard,
   Palette,
-  Save,
   Upload,
   Trash2,
   Edit,
@@ -94,6 +93,34 @@ export default function SettingsPage() {
     reminderTime: 24,
   })
 
+  const [bookingLinks, setBookingLinks] = useState<any[]>([])
+  const [newBookingLink, setNewBookingLink] = useState({
+    booking_slug: "",
+    label: "",
+    source: "",
+  })
+  const [isCreatingLink, setIsCreatingLink] = useState(false)
+  const [hasLoadedAppointmentSettings, setHasLoadedAppointmentSettings] = useState(false)
+  const [hasLoadedStudioSettings, setHasLoadedStudioSettings] = useState(false)
+  const [hasLoadedNotificationSettings, setHasLoadedNotificationSettings] = useState(false)
+  const saveTimeoutsRef = useRef<Record<string, NodeJS.Timeout | null>>({})
+  const [savingSections, setSavingSections] = useState({
+    shop: false,
+    appointments: false,
+    payments: false,
+    appearance: false,
+    security: false,
+    notifications: false,
+  })
+  const [lastSavedAt, setLastSavedAt] = useState<Record<string, string | null>>({
+    shop: null,
+    appointments: null,
+    payments: null,
+    appearance: null,
+    security: null,
+    notifications: null,
+  })
+
   const [notificationSettings, setNotificationSettings] = useState({
     emailEnabled: true,
     smsEnabled: true,
@@ -141,7 +168,6 @@ export default function SettingsPage() {
     dataRetention: 365,
   })
 
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [teamMembers, setTeamMembers] = useState<any[]>([])
   const [availableArtists, setAvailableArtists] = useState<any[]>([])
   const [isCreateUserOpen, setIsCreateUserOpen] = useState(false)
@@ -219,6 +245,13 @@ export default function SettingsPage() {
             console.error("Error fetching studio:", error?.message || error)
           } else {
             setStudio(data)
+            setAppointmentSettings((prev) => ({
+              ...prev,
+              allowOnlineBooking: data.allow_online_booking ?? prev.allowOnlineBooking,
+              requireDeposit: data.require_deposit ?? prev.requireDeposit,
+              depositAmount: data.deposit_amount ?? prev.depositAmount,
+              depositPercentage: data.deposit_percentage ?? prev.depositPercentage,
+            }))
           }
           await fetchTeamMembers(profileData.studio_id)
         }
@@ -228,6 +261,47 @@ export default function SettingsPage() {
 
     fetchStudio()
   }, [])
+
+  useEffect(() => {
+    if (!studio?.id) return
+    const loadLinks = async () => {
+      const response = await fetch("/api/booking-links")
+      if (!response.ok) return
+      const data = await response.json()
+      setBookingLinks(data || [])
+    }
+    loadLinks()
+  }, [studio?.id])
+
+  useEffect(() => {
+    if (!studio?.id) return
+    const loadStudioSettings = async () => {
+      try {
+        const response = await fetch(`/api/studios/${studio.id}/settings`)
+        if (!response.ok) return
+        const data = await response.json()
+        if (data?.shop) {
+          setShopSettings((prev) => ({ ...prev, ...data.shop }))
+        }
+        if (data?.appointments) {
+          setAppointmentSettings((prev) => ({ ...prev, ...data.appointments }))
+        }
+        if (data?.payments) {
+          setPaymentSettings((prev) => ({ ...prev, ...data.payments }))
+        }
+        if (data?.appearance) {
+          setAppearanceSettings((prev) => ({ ...prev, ...data.appearance }))
+        }
+        if (data?.security) {
+          setSecuritySettings((prev) => ({ ...prev, ...data.security }))
+        }
+      } finally {
+        setHasLoadedStudioSettings(true)
+        setHasLoadedAppointmentSettings(true)
+      }
+    }
+    loadStudioSettings()
+  }, [studio?.id])
 
   useEffect(() => {
     const fetchNotificationSettings = async () => {
@@ -250,6 +324,8 @@ export default function SettingsPage() {
         })
       } catch (error) {
         console.error("Error loading notification settings:", error)
+      } finally {
+        setHasLoadedNotificationSettings(true)
       }
     }
 
@@ -396,69 +472,235 @@ export default function SettingsPage() {
     }
   }
 
-  const handleSave = async () => {
+  const scheduleSectionSave = (section: string, callback: () => void) => {
+    const existingTimeout = saveTimeoutsRef.current[section]
+    if (existingTimeout) {
+      clearTimeout(existingTimeout)
+    }
+    saveTimeoutsRef.current[section] = setTimeout(() => {
+      callback()
+    }, 800)
+  }
+
+  const updateSavingState = (section: keyof typeof savingSections, isSaving: boolean) => {
+    setSavingSections((prev) => ({ ...prev, [section]: isSaving }))
+  }
+
+  const saveStudioSettingsSection = async (section: keyof typeof savingSections, data: any) => {
+    if (!studio?.id) return
+    updateSavingState(section, true)
     try {
-      await fetch("/api/notification-settings", {
+      const response = await fetch(`/api/studios/${studio.id}/settings`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ section, data }),
+      })
+      if (!response.ok) {
+        const message = await response.text()
+        console.error(`Failed to auto-save ${section} settings`, message)
+        return
+      }
+      setLastSavedAt((prev) => ({ ...prev, [section]: new Date().toLocaleTimeString() }))
+    } finally {
+      updateSavingState(section, false)
+    }
+  }
+
+  const saveNotificationSettings = async (settingsOverride?: typeof notificationSettings) => {
+    updateSavingState("notifications", true)
+    const settingsPayload = settingsOverride || notificationSettings
+    try {
+      const response = await fetch("/api/notification-settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email_enabled: notificationSettings.emailEnabled,
-          sms_enabled: notificationSettings.smsEnabled,
-          in_app_enabled: notificationSettings.inAppEnabled,
-          new_bookings: notificationSettings.newBookings,
-          cancellations: notificationSettings.cancellations,
-          payments: notificationSettings.payments,
-          reviews: notificationSettings.reviews,
-          reminders: notificationSettings.reminders,
-          reminder_time: notificationSettings.reminderTime,
-          notify_new_conversation: notificationSettings.notifyNewConversation,
-          notify_new_message: notificationSettings.notifyNewMessage,
+          email_enabled: settingsPayload.emailEnabled,
+          sms_enabled: settingsPayload.smsEnabled,
+          in_app_enabled: settingsPayload.inAppEnabled,
+          new_bookings: settingsPayload.newBookings,
+          cancellations: settingsPayload.cancellations,
+          payments: settingsPayload.payments,
+          reviews: settingsPayload.reviews,
+          reminders: settingsPayload.reminders,
+          reminder_time: settingsPayload.reminderTime,
+          notify_new_conversation: settingsPayload.notifyNewConversation,
+          notify_new_message: settingsPayload.notifyNewMessage,
         }),
       })
-      setHasUnsavedChanges(false)
-      alert("Settings saved successfully!")
+      if (!response.ok) {
+        const message = await response.text()
+        console.error("Failed to auto-save notification settings", message)
+        return
+      }
+      setLastSavedAt((prev) => ({ ...prev, notifications: new Date().toLocaleTimeString() }))
     } catch (error) {
-      console.error("Failed to save settings", error)
+      console.error("Failed to auto-save notification settings", error)
+    } finally {
+      updateSavingState("notifications", false)
+    }
+  }
+
+  const handleSaveAppointmentSettings = async (settingsOverride?: typeof appointmentSettings) => {
+    if (!studio?.id) return
+    updateSavingState("appointments", true)
+    try {
+      const sourceSettings = settingsOverride || appointmentSettings
+      const normalizedDepositAmount = Number.isFinite(sourceSettings.depositAmount)
+        ? sourceSettings.depositAmount
+        : 0
+      const normalizedPayload = {
+        ...sourceSettings,
+        requireDeposit: !!sourceSettings.requireDeposit,
+        depositPercentage: !!sourceSettings.depositPercentage,
+        depositAmount: normalizedDepositAmount,
+      }
+
+      const response = await fetch(`/api/studios/${studio.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          allow_online_booking: normalizedPayload.allowOnlineBooking,
+          require_deposit: normalizedPayload.requireDeposit,
+          deposit_amount: normalizedPayload.depositAmount,
+          deposit_percentage: normalizedPayload.depositPercentage,
+        }),
+      })
+      if (!response.ok) {
+        const message = await response.text()
+        console.error("Failed to save appointment settings", message)
+        return
+      }
+      const data = await response.json()
+      if (Array.isArray(data) && data[0]) {
+        setStudio(data[0])
+      } else if (data) {
+        setStudio(data)
+      }
+      if (normalizedPayload.depositAmount !== appointmentSettings.depositAmount) {
+        setAppointmentSettings((prev) => ({ ...prev, depositAmount: normalizedPayload.depositAmount }))
+      }
+      await saveStudioSettingsSection("appointments", normalizedPayload)
+    } finally {
+      updateSavingState("appointments", false)
+    }
+  }
+
+  const handleCreateBookingLink = async () => {
+    const bookingSlug = newBookingLink.booking_slug.trim()
+    if (!bookingSlug) return
+    setIsCreatingLink(true)
+    try {
+      const response = await fetch("/api/booking-links", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          booking_slug: bookingSlug,
+          label: newBookingLink.label || null,
+          source: newBookingLink.source || null,
+        }),
+      })
+      if (!response.ok) {
+        console.error("Failed to create booking link")
+        return
+      }
+      const data = await response.json()
+      setBookingLinks((prev) => [data, ...prev])
+      setNewBookingLink({ booking_slug: "", label: "", source: "" })
+    } finally {
+      setIsCreatingLink(false)
     }
   }
 
   const handleInputChange = (section: string, field: string, value: any) => {
-    setHasUnsavedChanges(true)
-
     switch (section) {
       case "shop":
-        setShopSettings((prev) => ({ ...prev, [field]: value }))
+        setShopSettings((prev) => {
+          const next = { ...prev, [field]: value }
+          if (studio?.id && hasLoadedStudioSettings) {
+            scheduleSectionSave("shop", () => {
+              saveStudioSettingsSection("shop", next)
+            })
+          }
+          return next
+        })
         break
       case "appointments":
-        setAppointmentSettings((prev) => ({ ...prev, [field]: value }))
+        setAppointmentSettings((prev) => {
+          const next = { ...prev, [field]: value }
+          if (studio?.id && hasLoadedAppointmentSettings) {
+            scheduleSectionSave("appointments", () => {
+              handleSaveAppointmentSettings(next)
+            })
+          }
+          return next
+        })
         break
       case "notifications":
-        setNotificationSettings((prev) => ({ ...prev, [field]: value }))
+        setNotificationSettings((prev) => {
+          const next = { ...prev, [field]: value }
+          if (hasLoadedNotificationSettings) {
+            scheduleSectionSave("notifications", () => {
+              saveNotificationSettings(next)
+            })
+          }
+          return next
+        })
         break
       case "payments":
-        setPaymentSettings((prev) => ({ ...prev, [field]: value }))
+        setPaymentSettings((prev) => {
+          const next = { ...prev, [field]: value }
+          if (studio?.id && hasLoadedStudioSettings) {
+            scheduleSectionSave("payments", () => {
+              saveStudioSettingsSection("payments", next)
+            })
+          }
+          return next
+        })
         break
       case "appearance":
-        setAppearanceSettings((prev) => ({ ...prev, [field]: value }))
+        setAppearanceSettings((prev) => {
+          const next = { ...prev, [field]: value }
+          if (studio?.id && hasLoadedStudioSettings) {
+            scheduleSectionSave("appearance", () => {
+              saveStudioSettingsSection("appearance", next)
+            })
+          }
+          return next
+        })
         break
       case "security":
-        setSecuritySettings((prev) => ({ ...prev, [field]: value }))
+        setSecuritySettings((prev) => {
+          const next = { ...prev, [field]: value }
+          if (studio?.id && hasLoadedStudioSettings) {
+            scheduleSectionSave("security", () => {
+              saveStudioSettingsSection("security", next)
+            })
+          }
+          return next
+        })
         break
     }
   }
 
   const handleBusinessHoursChange = (day: string, field: string, value: any) => {
-    setHasUnsavedChanges(true)
-    setShopSettings((prev) => ({
-      ...prev,
-      businessHours: {
-        ...prev.businessHours,
-        [day]: {
-          ...prev.businessHours[day as keyof typeof prev.businessHours],
-          [field]: value,
+    setShopSettings((prev) => {
+      const next = {
+        ...prev,
+        businessHours: {
+          ...prev.businessHours,
+          [day]: {
+            ...prev.businessHours[day as keyof typeof prev.businessHours],
+            [field]: value,
+          },
         },
-      },
-    }))
+      }
+      if (studio?.id && hasLoadedStudioSettings) {
+        scheduleSectionSave("shop", () => {
+          saveStudioSettingsSection("shop", next)
+        })
+      }
+      return next
+    })
   }
 
   const formatDayName = (day: string) => {
@@ -469,6 +711,9 @@ export default function SettingsPage() {
     return <div>Loading...</div>
   }
 
+  const isSavingAny = Object.values(savingSections).some(Boolean)
+  const activeTabSavedAt = lastSavedAt[activeTab] || "Not saved yet"
+
   return (
     <div className="flex flex-1 flex-col gap-6">
       <div className="flex items-center justify-between">
@@ -477,15 +722,10 @@ export default function SettingsPage() {
           <p className="text-muted-foreground">Manage your shop settings and preferences</p>
         </div>
         <div className="flex items-center gap-2">
-          {hasUnsavedChanges && (
-            <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
-              Unsaved Changes
-            </Badge>
-          )}
-          <Button onClick={handleSave} disabled={!hasUnsavedChanges}>
-            <Save className="mr-2 h-4 w-4" />
-            Save Changes
-          </Button>
+          <Badge variant="secondary" className="bg-emerald-100 text-emerald-900">
+            {isSavingAny ? "Saving..." : "Auto-save enabled"}
+          </Badge>
+          <span className="text-sm text-muted-foreground">Last saved: {activeTabSavedAt}</span>
         </div>
       </div>
 
@@ -847,7 +1087,13 @@ export default function SettingsPage() {
                         type="number"
                         value={appointmentSettings.depositAmount}
                         onChange={(e) =>
-                          handleInputChange("appointments", "depositAmount", Number.parseInt(e.target.value))
+                          handleInputChange(
+                            "appointments",
+                            "depositAmount",
+                            Number.isFinite(Number.parseFloat(e.target.value))
+                              ? Number.parseFloat(e.target.value)
+                              : 0,
+                          )
                         }
                         className="w-32"
                       />
@@ -912,6 +1158,80 @@ export default function SettingsPage() {
                   />
                 </div>
               )}
+              <div className="flex justify-end text-xs text-slate-500">
+                {savingSections.appointments ? "Saving..." : "Changes auto-save"}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Public Booking Links</CardTitle>
+              <CardDescription>Create shareable links for socials and your website.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="space-y-2">
+                  <Label htmlFor="booking-slug">Booking Slug</Label>
+                  <Input
+                    id="booking-slug"
+                    placeholder="summer-campaign"
+                    value={newBookingLink.booking_slug}
+                    onChange={(e) => setNewBookingLink({ ...newBookingLink, booking_slug: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="booking-label">Label</Label>
+                  <Input
+                    id="booking-label"
+                    placeholder="Instagram bio link"
+                    value={newBookingLink.label}
+                    onChange={(e) => setNewBookingLink({ ...newBookingLink, label: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="booking-source">Source</Label>
+                  <Input
+                    id="booking-source"
+                    placeholder="instagram"
+                    value={newBookingLink.source}
+                    onChange={(e) => setNewBookingLink({ ...newBookingLink, source: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <Button onClick={handleCreateBookingLink} disabled={isCreatingLink}>
+                  {isCreatingLink ? "Creating..." : "Create Link"}
+                </Button>
+              </div>
+
+              <div className="space-y-3">
+                {bookingLinks.length === 0 && (
+                  <p className="text-sm text-muted-foreground">No booking links created yet.</p>
+                )}
+                {bookingLinks.map((link) => {
+                  const baseUrl =
+                    typeof window !== "undefined" ? window.location.origin : process.env.NEXT_PUBLIC_APP_URL || ""
+                  return (
+                    <div key={link.id} className="rounded-lg border border-slate-200 p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <div className="font-medium">{link.label || link.booking_slug}</div>
+                          <div className="text-xs text-muted-foreground">{link.source || "general"}</div>
+                        </div>
+                        <Badge variant={link.is_active ? "default" : "secondary"}>
+                          {link.is_active ? "Active" : "Inactive"}
+                        </Badge>
+                      </div>
+                      {studio?.id && (
+                        <div className="mt-2 break-all text-xs text-slate-600">
+                          {baseUrl}/studios/{studio.id}/book/{link.booking_slug}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
